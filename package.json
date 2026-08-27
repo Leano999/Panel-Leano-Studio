@@ -1,0 +1,15 @@
+{
+  "name": "streampanel",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Panel siaran pribadi - overlay, soundboard, dan TTS untuk live streaming (basic version, personal use).",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "tiktok-live-connector": "^2.4.3"
+  }
+}

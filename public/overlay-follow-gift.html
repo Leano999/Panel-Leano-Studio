@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Follow + Gift Notifications</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif}
+*{box-sizing:border-box}
+#eventFx{position:fixed;inset:0;pointer-events:none;z-index:50}
+#eventFx.pos-top-center{display:flex;align-items:flex-start;justify-content:center;padding-top:70px}
+#eventFx.pos-center{display:flex;align-items:center;justify-content:center}
+#eventFx.pos-bottom-center{display:flex;align-items:flex-end;justify-content:center;padding-bottom:110px}
+.fx-card{position:relative;min-width:390px;max-width:min(680px,80vw);padding:14px 24px;border-radius:22px;display:flex;align-items:center;gap:16px;color:#fff;overflow:hidden;transform:translateY(-8px);opacity:0;box-shadow:0 8px 24px rgba(0,0,0,.30);border:1px solid rgba(255,255,255,.22);}
+.fx-card{transition:opacity .18s ease,transform .18s ease}.fx-card.enter{opacity:1;transform:translateY(0)}.fx-card.leave{opacity:0;transform:translateY(-8px)}
+.fx-card.leave{opacity:0;transform:translateY(-8px)}
+.fx-avatar{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;font-size:28px;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.7);box-shadow:0 0 24px rgba(255,255,255,.25)}
+.fx-text{min-width:0;text-align:left}.fx-kicker{font:800 11px Inter,sans-serif;letter-spacing:2px;text-transform:uppercase;opacity:.9}.fx-user{font:900 22px 'Space Grotesk',Inter,sans-serif;margin-top:2px;text-shadow:0 3px 14px rgba(0,0,0,.35)}.fx-sub{font:700 13px Inter,sans-serif;opacity:.95;margin-top:3px} .fx-particle{display:none}.fx-wings{background:linear-gradient(110deg,#0c1535,#322067 48%,#071c3d);border-color:#25d9ff}.fx-wings::before{content:"";display:none}.fx-neon{background:linear-gradient(110deg,#090b18,#3d1850,#101c56);border-color:#8b6bf2}.fx-cat{background:linear-gradient(110deg,#071d38,#0e4d67,#172046);border-color:#25d9ff}.fx-cat::after{display:none}.fx-treasure{background:linear-gradient(110deg,#35200b,#765016 45%,#3a1908);border-color:#ffd44d}.fx-rose{background:linear-gradient(110deg,#3b0b1d,#7d214b 48%,#430a2b);border-color:#ff76b7}.fx-universe{background:linear-gradient(110deg,#24164f,#151044 55%,#050718);border-color:#9b8cff}
+}50%{transform:translateY(-16px) scale(1.2);opacity:1}}
+</style></head><body><div id="eventFx" class="pos-top-center"></div><script src="/socket.io/socket.io.js"></script><script>
+const socket=io({ transports: ['websocket'] });const eventFx=document.getElementById('eventFx');
+let settings={enabled:true,followStyle:'wings',giftStyle:'treasure',followDuration:4,giftDuration:5,position:'top-center'};
+socket.on('overlay:settings',s=>{settings={...settings,...(s?.animations||{})};});
+socket.on('event',p=>{if(p&&p.kind==='alert'&&(p.type==='follow'||p.type==='gift')&&settings.enabled)show(p);});
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function show({type,username,extra}){eventFx.className='pos-'+(settings.position||'top-center');const style=type==='follow'?(settings.followStyle||'wings'):(settings.giftStyle||'treasure');const duration=Math.max(2,Math.min(10,Number(type==='follow'?settings.followDuration:settings.giftDuration)||4));const card=document.createElement('div');card.className='fx-card fx-'+style;const icon=type==='follow'?'✦':style==='rose'?'🌹':style==='universe'?'🌌':'🎁';const kicker=type==='follow'?'NEW FOLLOWER':'GIFT MASUK';const sub=extra|| (type==='follow'?'Baru saja follow!':'mengirim gift!');card.innerHTML='<span class="fx-particle p1"></span><span class="fx-particle p2"></span><span class="fx-particle p3"></span><span class="fx-particle p4"></span><div class="fx-avatar">'+icon+'</div><div class="fx-text"><div class="fx-kicker">'+kicker+'</div><div class="fx-user">@'+esc(username||'Penonton')+'</div><div class="fx-sub">'+esc(sub)+'</div></div>';eventFx.appendChild(card);requestAnimationFrame(()=>card.classList.add('enter'));const leaveMs=950;setTimeout(()=>{card.classList.remove('enter');void card.offsetWidth;card.classList.add('leave');setTimeout(()=>card.remove(),leaveMs+60)},Math.max(1200,duration*1000-leaveMs));}
+</script></body></html>

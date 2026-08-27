@@ -1,0 +1,1 @@
+V39 UI: Hero PANEL LEANO STUDIO now exists only inside Dashboard. Other workspace tabs no longer render the hero. Typography, spacing, gradient and glow refined to match the provided reference image more closely. Existing workspaces and feature logic preserved.

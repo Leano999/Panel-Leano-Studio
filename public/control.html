@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Panel Leano — Live Control Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css" />
+<link rel="stylesheet" href="control.css">
+</head>
+<body>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="side-brand">
+      <div class="side-logo">PL</div>
+      <div>
+        <div class="side-title">PANEL <span>LEANO</span></div>
+        <div class="side-sub">LIVE CONTROL STUDIO</div>
+      </div>
+    </div>
+    <div class="side-section-label">WORKSPACE</div>
+    <nav class="tabs app-tabs sidebar-tabs">
+      <button class="active" data-tab="dashboard"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
+      <button data-tab="browser"><span class="nav-icon">▤</span><span>Browser</span></button>
+      <button data-tab="tiktok"><span class="nav-icon">◉</span><span>TikTok Live</span></button>
+      <button data-tab="preview"><span class="nav-icon">💬</span><span>Chat Live</span></button>
+      <button data-tab="events"><span class="nav-icon">✦</span><span>Custom Events</span></button>
+      <button data-tab="overlays"><span class="nav-icon">▣</span><span>Overlay Gallery</span></button>
+      <button data-tab="tts"><span class="nav-icon">◌</span><span>Text-to-Speech</span></button>
+      <button data-tab="sound"><span class="nav-icon">◖</span><span>Soundboard</span></button>
+      <button data-tab="music"><span class="nav-icon">♫</span><span>Music Request</span></button>
+      <button data-tab="simulator"><span class="nav-icon">▷</span><span>Simulator</span></button>
+    </nav>
+    <div class="side-section-label side-bottom-label">SYSTEM</div>
+    <div class="side-system-card">
+      <div class="system-dot"></div>
+      <div><b>Panel aktif</b><small>Server &amp; socket siap digunakan</small></div>
+    </div>
+  </aside>
+
+  <main class="workspace">
+    <div class="topbar">
+      <div class="topbar-left"><span class="crumb">PANEL LEANO</span><span class="slash">/</span><span class="crumb-muted">Live Control Center</span></div>
+      <div class="topbar-right">
+        <span class="top-chip">⌁ LOCAL PANEL</span>
+        <span class="top-status"><i id="topConnDot"></i><span id="topConnStatus">BELUM TERHUBUNG</span></span>
+        <button class="v38-icon-btn" type="button" aria-label="Notifikasi" title="Notifikasi">♧</button>
+        <button class="v38-icon-btn" type="button" aria-label="Pengaturan" title="Pengaturan">⚙</button>
+        <div class="top-avatar">L</div>
+      </div>
+    </div>
+
+    <div class="shell">
+
+  <header class="deck">
+    <div class="window-chrome" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </div>
+    <div class="brand">
+      <div>
+        <div class="name"><span class="name-panel">PANEL</span> <span class="name-leano">LEANO</span><span class="name-studio">STUDIO</span></div>
+        <div class="sub">Live Control Center — events, overlays, TTS, simulator &amp; analytics</div>
+      </div>
+      <div class="bars"><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="status">
+      <div class="dot"></div>
+      <span id="connStatus">BELUM TERHUBUNG</span>
+    </div>
+  </header>
+
+
+
+
+
+
+  <!-- BROWSER SOURCES -->
+  <section class="panel" id="tab-browser">
+    <div class="source-panel" style="margin:0;">
+      <div class="section-heading">
+        <div><h2>Browser Sources</h2><p>URL siap pakai untuk OBS Studio.</p></div>
+        <span>4 SOURCES</span>
+      </div>
+
+      <div class="url-box" style="margin-bottom:10px;">
+        <b style="min-width:180px;">OBS: ALERT + TTS</b>
+        <code id="overlayUrl">memuat...</code>
+        <button class="btn" onclick="copyOverlayUrl()">Salin URL</button>
+        <span class="hint" style="margin:0;">→ Browser Source utama. Sudah termasuk alert + TTS.</span>
+      </div>
+      <div class="url-box" style="margin-bottom:10px;">
+        <b style="min-width:180px;">OBS: LEADERBOARD</b>
+        <code id="leaderboardUrl">memuat...</code>
+        <button class="btn" onclick="copyLeaderboardUrl()">Salin URL</button>
+        <span class="hint" style="margin:0;">→ Browser Source terpisah untuk leaderboard like.</span>
+      </div>
+      <div class="url-box" style="margin-bottom:10px;">
+        <b style="min-width:180px;">OBS: KOMENTAR LIVE</b>
+        <code id="commentsUrl">memuat...</code>
+        <button class="btn" onclick="copyCommentsUrl()">Salin URL</button>
+        <span class="hint" style="margin:0;">→ Browser Source terpisah. Menampilkan 8 komentar terbaru secara vertikal.</span>
+      </div>
+      <div class="url-box" style="margin-bottom:10px;">
+        <b style="min-width:180px;">OBS: MUSIC REQUEST</b>
+        <code id="musicUrl">memuat...</code>
+        <button class="btn" onclick="copyMusicUrl()">Salin URL</button>
+        <span class="hint" style="margin:0;">→ Browser Source visual saja: lagu aktif + jumlah antrian.</span>
+      </div>
+      <div class="url-box" style="margin-bottom:0;">
+        <b style="min-width:180px;">CHROME: MUSIC PLAYER</b>
+        <code id="musicPlayerUrl">memuat...</code>
+        <button class="btn" type="button" onclick="copyMusicPlayerUrl()">Salin URL</button>
+        <span class="hint" style="margin:0;">→ Buka di Chrome. Ini yang memainkan audio musik.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- DASHBOARD -->
+  <section class="panel active" id="tab-dashboard">
+    <section class="welcome-banner v38-hero">
+      <div class="v38-hero-lines" aria-hidden="true"><span></span><span></span><span></span></div>
+      <div class="v38-hero-copy">
+        <div class="v38-hero-kicker">LIVE CONTROL CENTER</div>
+        <div class="v38-hero-title"><span>PANEL</span> <strong>LEANO</strong></div>
+        <div class="v38-hero-studio">STUDIO</div>
+        <div class="v38-hero-sub">Stream Better • Control Smarter • Grow Faster</div>
+      </div>
+      <div class="v38-hero-orbit" aria-hidden="true"><i></i><i></i><i></i></div>
+    </section>
+    <div class="v38-status-row">
+      <div class="v38-status-chip"><i class="live"></i><div><b>Live Control</b><span>Panel aktif</span></div></div>
+      <div class="v38-status-chip"><i class="server"></i><div><b id="serverStateText">Server Online</b><span>Socket siap digunakan</span></div></div>
+      <div class="v38-status-chip"><i class="violet"></i><div><b id="dashConnectionText">Belum Terhubung</b><span>TikTok Live</span></div></div>
+      <div class="v38-status-chip"><i class="blue"></i><div><b id="dashboardClock">00:00:00</b><span>Session</span></div></div>
+    </div>
+
+    <div class="v38-service-grid">
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'browser\']').click()">
+        <span class="v38-service-icon">▣</span><span><b>OBS</b><small>Browser Sources</small></span><em>OPEN</em>
+      </button>
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'tts\']').click()">
+        <span class="v38-service-icon">♩</span><span><b>TTS</b><small>Text to Speech</small></span><em>OPEN</em>
+      </button>
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'browser\']').click()">
+        <span class="v38-service-icon">♛</span><span><b>Leaderboard</b><small>Top Donor / Like</small></span><em>OPEN</em>
+      </button>
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'preview\']').click()">
+        <span class="v38-service-icon">▣</span><span><b>Komentar Live</b><small>Live Chat Monitor</small></span><em>OPEN</em>
+      </button>
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'music\']').click()">
+        <span class="v38-service-icon">♫</span><span><b>Music Request</b><small>Song Request</small></span><em>OPEN</em>
+      </button>
+      <button class="v38-service-card" onclick="document.querySelector('[data-tab=\'simulator\']').click()">
+        <span class="v38-service-icon">▷</span><span><b>Simulator</b><small>Test Events</small></span><em>OPEN</em>
+      </button>
+    </div>
+
+    <div class="v38-section-title"><span>SESSION STATISTICS</span><small>Data real-time dari server</small></div>
+    <div class="row" style="gap:12px;flex-wrap:wrap;">
+      <div class="strip" style="flex:1;min-width:150px;"><div class="tag">COMMENTS</div><div class="title" id="statComments">0</div><div class="desc">komentar masuk</div></div>
+      <div class="strip" style="flex:1;min-width:150px;"><div class="tag">LIKES</div><div class="title" id="statLikes">0</div><div class="desc">like sesi ini</div></div>
+      <div class="strip" style="flex:1;min-width:150px;"><div class="tag">FOLLOW</div><div class="title" id="statFollows">0</div><div class="desc">follow masuk</div></div>
+      <div class="strip" style="flex:1;min-width:150px;"><div class="tag">GIFT</div><div class="title" id="statGifts">0</div><div class="desc">gift masuk</div></div>
+    </div>
+
+    <div class="row" style="gap:16px;align-items:stretch;margin-top:16px;flex-wrap:wrap;">
+      <div class="field" style="flex:1;min-width:300px;">
+        <label>LIVE GOAL</label>
+        <div class="row">
+          <input id="goalTitle" type="text" placeholder="Contoh: Like Goal" style="flex:1;">
+          <select id="goalType" style="width:150px;">
+            <option value="likes">Likes</option><option value="comments">Komentar</option>
+            <option value="gifts">Gift</option>
+          </select>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <input id="goalCurrent" type="number" min="0" placeholder="Saat ini" style="flex:1;">
+          <input id="goalTarget" type="number" min="1" placeholder="Target" style="flex:1;">
+          <button class="btn" onclick="saveGoal()">Simpan Goal</button>
+        </div>
+        <label style="display:flex;gap:8px;align-items:center;margin-top:10px;font-size:12px;">
+          <input id="goalEnabled" type="checkbox" checked> tampilkan goal di overlay
+        </label>
+      </div>
+
+      <div class="field" style="flex:1;min-width:300px;">
+        <label>SESSION</label>
+        <div class="hint">Statistik disimpan selama server berjalan.</div>
+        <button class="btn" style="margin-top:12px;" onclick="resetStats()">Reset Statistik</button>
+        <div class="hint" style="margin-top:10px;">Event terakhir: <span id="lastEventAt">-</span></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- TIKTOK LIVE -->
+  <section class="panel" id="tab-tiktok">
+    <div class="field">
+      <label>USERNAME TIKTOK KAMU (tanpa @)</label>
+      <div class="row">
+        <input type="text" id="tiktokUsername" placeholder="contoh: namakamu" style="flex:1;">
+        <button class="btn" id="tiktokConnectBtn" style="background:var(--cyan); border-color:var(--cyan); color:#0A0D14;" onclick="connectTiktok()">Sambungkan</button>
+        <button class="btn" onclick="disconnectTiktok()">Putuskan</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>API KEY (opsional, sangat disarankan)</label>
+      <input type="text" id="tiktokApiKey" placeholder="tempel API key gratis dari eulerstream.com di sini">
+    </div>
+    <div id="tiktokStatusBox" class="strip" style="--accent: var(--muted); cursor:default;">
+      <div class="tag">STATUS</div>
+      <div class="title" id="tiktokStatusTitle">Belum tersambung</div>
+      <div class="desc" id="tiktokStatusDesc">Masukkan username lalu klik Sambungkan. Kamu harus sedang LIVE di TikTok supaya bisa nyambung.</div>
+    </div>
+    <p class="hint">
+      Setelah tersambung, follow/like/gift/komentar asli dari live TikTok kamu otomatis muncul di overlay —
+      tombol manual di tab "Alert Overlay" tetap bisa dipakai kapan saja sebagai tambahan.
+      Ini pakai library komunitas tidak resmi, jadi bisa berhenti bekerja sewaktu-waktu kalau TikTok mengubah sistemnya.
+      Tanpa API key, koneksi sering gagal/lambat karena dibatasi ketat — bikin API key gratis di
+      <a href="https://www.eulerstream.com" target="_blank" style="color:var(--cyan);">eulerstream.com</a> (tinggal daftar, tanpa kartu kredit),
+      lalu tempel di kolom di atas.
+    </p>
+  </section>
+
+  <!-- ALERTS -->
+  <section class="panel" id="tab-alerts">
+    <div class="grid">
+      <button class="strip" style="--accent: var(--cyan)" onclick="sendAlert('follow')">
+        <div class="tag">Follow</div>
+        <div class="title">Follower Baru</div>
+        <div class="desc">Tampilkan alert follow di overlay</div>
+      </button>
+      <button class="strip" style="--accent: var(--magenta)" onclick="sendAlert('like')">
+        <div class="tag">Like</div>
+        <div class="title">Like Masuk</div>
+        <div class="desc">Tampilkan alert like di overlay</div>
+      </button>
+      <button class="strip" style="--accent: var(--gold)" onclick="sendAlert('gift')">
+        <div class="tag">Gift</div>
+        <div class="title">Kirim Hadiah</div>
+        <div class="desc">Tampilkan alert donasi/gift</div>
+      </button>
+      <button class="strip" style="--accent: var(--violet)" onclick="sendAlert('comment')">
+        <div class="tag">Comment</div>
+        <div class="title">Komentar</div>
+        <div class="desc">Tampilkan komentar di overlay</div>
+      </button>
+    </div>
+
+    <div class="field" style="margin-top:20px;">
+      <label>DETAIL ALERT (opsional, dipakai untuk tombol di atas)</label>
+      <div class="row" style="gap:10px; flex-wrap:wrap;">
+        <input type="text" id="alertUser" placeholder="Nama pengguna" style="flex:1; min-width:160px; background:var(--panel); border:1px solid var(--line); border-radius:8px; color:var(--text); padding:10px 12px; font-family:Inter,sans-serif;">
+        <input type="text" id="alertExtra" placeholder="Nama gift / isi komentar (jika ada)" style="flex:2; min-width:200px; background:var(--panel); border:1px solid var(--line); border-radius:8px; color:var(--text); padding:10px 12px; font-family:Inter,sans-serif;">
+      </div>
+    </div>
+
+    <p class="hint">
+      Ini adalah trigger manual buat testing atau alert tambahan. Kalau kamu sudah tersambung ke live TikTok
+      di tab "TikTok Live", follow/like/gift/komentar asli juga otomatis muncul di sini tanpa perlu ditekan manual.
+    </p>
+  </section>
+
+
+  <!-- CUSTOM EVENTS -->
+  <section class="panel" id="tab-events">
+    <div class="preview-toolbar">
+      <div>
+        <div class="display" style="font-size:18px;font-weight:700;">Custom Action Events</div>
+        <div class="hint">Konsepnya seperti rule: ketika event tertentu terjadi, jalankan aksi otomatis.</div>
+      </div>
+      <button class="btn" onclick="addAction()">+ Tambah Event</button>
+    </div>
+    <div id="actionList"></div>
+    <div class="hint" style="margin-top:14px;">
+      Variabel yang bisa dipakai: <code>{username}</code>, <code>{comment}</code>, <code>{gift}</code>.
+      Contoh: komentar mengandung <b>halo</b> → TTS menyapa penonton.
+    </div>
+    <button class="btn" style="margin-top:12px;background:var(--violet);border-color:var(--violet);color:#fff;" onclick="saveActions()">Simpan Semua Rules</button>
+  </section>
+
+  <!-- OVERLAY GALLERY -->
+  <section class="panel" id="tab-overlays">
+    <div class="display" style="font-size:18px;font-weight:700;">Overlay Gallery</div>
+    <p class="hint">Pilih tema lalu lihat hasilnya di preview. Tema ini berlaku untuk chat, alert, TTS bubble, dan goal.</p>
+    <div class="theme-grid" style="margin-top:14px;">
+      <button class="theme-card active" data-theme="glass" onclick="setTheme('glass')"><div class="theme-swatch" style="background:linear-gradient(120deg,#131826,#171e2e);"></div><b>Glass Dark</b><div class="hint">Clean & profesional</div></button>
+      <button class="theme-card" data-theme="neon" onclick="setTheme('neon')"><div class="theme-swatch" style="background:linear-gradient(120deg,#090c19,#28154a);"></div><b>Neon</b><div class="hint">Gaming / energetic</div></button>
+      <button class="theme-card" data-theme="bubble" onclick="setTheme('bubble')"><div class="theme-swatch" style="background:linear-gradient(120deg,#fff,#eef1ff);"></div><b>Light Bubble</b><div class="hint">Terang & friendly</div></button>
+      <button class="theme-card" data-theme="minimal" onclick="setTheme('minimal')"><div class="theme-swatch" style="background:#0a0d14;"></div><b>Minimal</b><div class="hint">Tidak mengganggu gameplay</div></button>
+      <button class="theme-card" data-theme="pink" onclick="setTheme('pink')"><div class="theme-swatch" style="background:linear-gradient(120deg,#230a19,#50102f);"></div><b>Pink Live</b><div class="hint">Playful & bright</div></button>
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <label>STYLE BUBBLE KOMENTAR</label>
+      <div class="hint">Ini benar-benar mengubah bentuk/layout bubble, bukan cuma warna. Jarak default juga dibuat lebih renggang.</div>
+      <div class="theme-grid" style="margin-top:12px;">
+        <button class="theme-card chat-style-card active" data-chat-style="glass-card" onclick="setChatStyle('glass-card')"><div class="chat-demo glass-demo"><span>AA</span><b>@user</b><small>Halo bang!</small></div><b>Glass Card</b><div class="hint">Clean</div></button>
+        <button class="theme-card chat-style-card" data-chat-style="pill" onclick="setChatStyle('pill')"><div class="chat-demo pill-demo"><span>AA</span><b>@user</b><small>Halo bang!</small></div><b>Pill Bubble</b><div class="hint">Modern</div></button>
+        <button class="theme-card chat-style-card" data-chat-style="speech" onclick="setChatStyle('speech')"><div class="chat-demo speech-demo"><span>AA</span><div><b>@user</b><small>Halo bang!</small></div></div><b>Speech Bubble</b><div class="hint">Bubble + tail</div></button>
+        <button class="theme-card chat-style-card" data-chat-style="stacked" onclick="setChatStyle('stacked')"><div class="chat-demo stacked-demo"><span>AA</span><div><b>@user</b><small>Halo bang!</small></div></div><b>Stacked</b><div class="hint">Streamer style</div></button>
+        <button class="theme-card chat-style-card" data-chat-style="neon-line" onclick="setChatStyle('neon-line')"><div class="chat-demo neon-demo"><span>AA</span><div><b>@user</b><small>Halo bang!</small></div></div><b>Neon Line</b><div class="hint">Gaming</div></button>
+        <button class="theme-card chat-style-card" data-chat-style="compact" onclick="setChatStyle('compact')"><div class="chat-demo compact-demo"><span>AA</span><div><b>@user</b><small>Halo bang!</small></div></div><b>Compact</b><div class="hint">Minimal</div></button>
+      </div>
+      <div class="row" style="margin-top:14px;gap:16px;align-items:center;flex-wrap:wrap;">
+        <label style="min-width:220px;flex:1;">JARAK ANTAR KOMENTAR <input id="chatGap" type="range" min="8" max="28" step="1" value="16" oninput="setChatGap(this.value)"></label>
+        <span class="strip" style="min-width:110px;--accent:var(--violet);"><span class="tag">GAP</span><span class="title" id="chatGapValue">16px</span></span>
+      </div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveChatStyle()">Simpan Style Chat</button><span class="hint" id="chatStyleStatus" style="margin:0;">Glass Card · 14px</span></div>
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <label>NOTIFIKASI FOLLOW &amp; GIFT — ANIMASI</label>
+      <div class="hint">Follow/Gift akan muncul sebagai animasi beberapa detik di atas overlay, terpisah dari chat permanen. Username ditampilkan sebagai @username.</div>
+      <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;min-width:180px;"><input id="animEnabled" type="checkbox" checked> Aktifkan animasi</label>
+        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>STYLE FOLLOW</label><select id="followAnimStyle"><option value="wings">Style 1 — Crown Wings</option><option value="neon">Style 2 — Neon Burst</option><option value="cat">Style 3 — Music Cat</option></select></div>
+        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>STYLE GIFT</label><select id="giftAnimStyle"><option value="treasure">Style 1 — Treasure</option><option value="rose">Style 2 — Rose</option><option value="universe">Style 3 — Universe</option></select></div>
+      </div>
+      <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
+        <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI FOLLOW (DETIK)</label><input id="followAnimDuration" type="number" min="2" max="10" step="1" value="4"></div>
+        <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI GIFT (DETIK)</label><input id="giftAnimDuration" type="number" min="2" max="10" step="1" value="5"></div>
+        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>POSISI</label><select id="animPosition"><option value="top-center">Atas Tengah</option><option value="center">Tengah</option><option value="bottom-center">Bawah Tengah</option></select></div>
+      </div>
+      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveAnimationSettings()">Simpan Animasi</button><button class="btn" onclick="testAnimation('follow')">▶ Test Follow</button><button class="btn" onclick="testAnimation('gift')">▶ Test Gift</button><span class="hint" id="animStatus" style="margin:0;">Belum disimpan.</span></div>
+    </div>
+
+    <div class="field" style="margin-top:18px;">
+      <label>BROWSER SOURCE — PISAHKAN</label><div class="hint">Gunakan Browser Source terpisah: Chat, Goal, Alert, dan TTS Audio. Jangan gabungkan Chat + Goal.</div>
+      <div class="url-box"><b style="min-width:180px;">KOMENTAR LIVE</b><code id="srcChat">memuat...</code><button class="btn" onclick="cp('srcChat')">Salin</button></div>
+      <div class="url-box"><b style="min-width:180px;">FOLLOW + GIFT</b><code id="srcFollowGift">memuat...</code><button class="btn" onclick="cp('srcFollowGift')">Salin</button></div>
+      <div class="url-box"><b style="min-width:180px;">LIVE GOAL</b><code id="srcGoal">memuat...</code><button class="btn" onclick="cp('srcGoal')">Salin</button></div>
+      <div class="url-box"><b style="min-width:180px;">ALERT + TTS</b><code id="srcAlert">memuat...</code><button class="btn" onclick="cp('srcAlert')">Salin</button></div>
+      <div class="url-box"><b style="min-width:180px;">TTS ONLY (opsional)</b><code id="srcTts">memuat...</code><button class="btn" onclick="cp('srcTts')">Salin</button></div>
+      <div class="url-box"><code id="galleryCommentsUrl">memuat...</code><button class="btn" onclick="copyCommentsUrl()">Salin</button></div>
+      <div class="url-box"><code id="galleryOverlayUrl">memuat...</code><button class="btn" onclick="copyOverlayUrl()">Salin</button></div>
+    </div>
+  </section>
+
+  <!-- SOUNDBOARD -->
+  <section class="panel" id="tab-sound">
+    <div class="grid" id="soundGrid"></div>
+    <p class="hint">
+      Suara di atas dibuat langsung di browser (synth sederhana), jadi langsung bisa dipakai tanpa file tambahan.
+      Mau pakai file MP3 sendiri? taruh file di folder <code class="mono">public/sounds/</code> lalu kasih tahu aku nama filenya,
+      nanti aku sambungkan ke tombolnya.
+    </p>
+  </section>
+
+
+  <!-- TTS -->
+  <section class="panel" id="tab-tts">
+    <div class="field">
+      <label>BACA OTOMATIS DARI LIVE TIKTOK</label>
+      <div class="row" style="gap:24px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size:14px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="ttsReadComments" onchange="updateTtsSettings()" style="width:16px; height:16px; accent-color: var(--violet);">
+          Baca komentar otomatis
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size:14px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="ttsReadLikes" onchange="updateTtsSettings()" style="width:16px; height:16px; accent-color: var(--violet);">
+          Baca like otomatis
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size:14px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="ttsReadFollows" onchange="updateTtsSettings()" style="width:16px; height:16px; accent-color: var(--violet);">
+          Baca follow via TTS
+        </label>
+        <label style="display:flex; align-items:center; gap:8px; font-family:'Inter',sans-serif; font-size:14px; color:var(--text); cursor:pointer;">
+          <input type="checkbox" id="ttsReadGifts" onchange="updateTtsSettings()" style="width:16px; height:16px; accent-color: var(--violet);">
+          Baca gift via TTS
+        </label>
+      </div>
+      <p class="hint" style="margin-top:8px;">
+        Komentar dibaca dari teks komentarnya saja (tanpa username). Follow dan gift default memakai SFX khusus, bukan TTS.
+        Jika ingin TTS untuk follow/gift, centang opsinya. Like tidak dibacakan otomatis secara default karena like bisa datang sangat cepat dan membuat TTS spam. Jika diperlukan, centang opsi tersebut.
+      </p>
+    </div>
+
+    <div class="field" style="border-top:1px solid var(--line); padding-top:20px;">
+      <label>PILIH SUARA</label>
+      <select id="ttsVoice" onchange="updateTtsSettings()">
+        <option value="">Otomatis — Bahasa Indonesia</option>
+      </select>
+      <div class="voice-status" id="voiceStatus">Mencari suara yang tersedia di browser…</div>
+      <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="unlockTts()">🔊 Aktifkan TTS Live</button>
+        <button class="btn" onclick="testSelectedVoice()">Tes Suara Terpilih</button>
+      </div>
+      <div class="hint" id="ttsDiagnostic" style="margin-top:7px;">
+        TTS komentar LIVE berjalan dari panel ini setelah tombol "Aktifkan TTS Live" ditekan sekali. Ini menghindari blokir autoplay pada Browser Source OBS.
+      </div>
+      <p class="hint">
+        Daftar ini mengikuti suara yang tersedia di komputer/browser. Jika Chrome menyediakan
+        suara Google, biasanya akan muncul sebagai <b>Google ...</b>. Suara perempuan/laki-laki
+        yang tersedia juga akan muncul di sini.
+      </p>
+    </div>
+
+    <div class="row" style="gap:16px; flex-wrap:wrap;">
+      <div class="field" style="flex:1; min-width:220px; margin:0;">
+        <label>KECEPATAN</label>
+        <input type="range" id="ttsRate" min="0.6" max="1.5" step="0.05" value="1" oninput="updateTtsSettings()">
+        <div class="voice-status"><span id="ttsRateValue">1.00x</span></div>
+      </div>
+      <div class="field" style="flex:1; min-width:220px; margin:0;">
+        <label>NADA SUARA</label>
+        <input type="range" id="ttsPitch" min="0.5" max="1.5" step="0.05" value="1" oninput="updateTtsSettings()">
+        <div class="voice-status"><span id="ttsPitchValue">1.00</span></div>
+      </div>
+      <div class="field" style="flex:1; min-width:220px; margin:0;">
+        <label>VOLUME GOOGLE TTS</label>
+        <input type="range" id="ttsVolume" min="0" max="100" step="1" value="100" oninput="updateTtsSettings()">
+        <div class="voice-status"><span id="ttsVolumeValue">100%</span></div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top:24px; border-top:1px solid var(--line); padding-top:20px;">
+      <label>PESAN MANUAL — UNTUK TEST / PENGUMUMAN</label>
+      <textarea id="ttsText" placeholder="Contoh: Terima kasih sudah mampir!"></textarea>
+    </div>
+    <div class="row">
+      <button class="btn" style="background:var(--violet); border-color:var(--violet); color:#fff;" onclick="sendTts()">Baca di Overlay</button>
+      <button class="btn" onclick="previewTts()">Dengar Preview</button>
+    </div>
+    <p class="hint">
+      Kolom manual bukan untuk membaca chat otomatis. Fungsinya hanya untuk testing suara atau
+      menyampaikan pengumuman dari kamu sendiri. Komentar TikTok akan masuk otomatis lewat event LIVE.
+    </p>
+  </section>
+
+
+
+
+  <!-- MUSIC REQUEST -->
+  <section class="panel" id="tab-music">
+    <div class="panel" style="display:block">
+      <h2>🎵 Music Request YouTube</h2>
+      <p class="hint">Penonton cukup komentar <code>!song - judul lagu</code>. Sistem mencari hasil YouTube pertama, memasukkannya ke antrean, lalu memutar otomatis. Browser Source <b>MUSIC REQUEST</b> menampilkan lagu yang sedang diputar dan jumlah antrean.</p>
+      <div class="grid">
+        <div class="strip"><div class="tag">CURRENT</div><div class="title" id="musicCurrentTitle">Belum ada lagu</div><div class="desc" id="musicCurrentBy">-</div></div>
+        <div class="strip"><div class="tag">QUEUE</div><div class="title" id="musicQueueCount">0</div><div class="desc">lagu menunggu</div></div>
+      </div>
+      <div class="row" style="margin-top:14px;flex-wrap:wrap;">
+        <button class="btn" onclick="musicSkip()">⏭ Skip Lagu</button>
+        <button class="btn" onclick="musicClear()">🗑 Clear Queue</button>
+        <button class="btn" onclick="musicStop()">⏹ Stop Music</button>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>VOLUME MUSIK CHROME</label>
+        <input type="range" id="musicVolume" min="0" max="100" step="1" value="75" oninput="updateMusicVolume()">
+        <div class="voice-status"><span id="musicVolumeValue">75%</span></div>
+        <p class="hint">Mengatur volume YouTube di halaman <b>CHROME: MUSIC PLAYER</b>. Ini tidak mengubah volume TTS.</p>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>🔊 PEMUTAR MUSIK DI CHROME</label>
+        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn" id="musicActivateBtn" type="button" onclick="activateChromeMusic()">▶ Aktifkan Audio Chrome</button>
+          <span id="musicBrowserStatus" class="voice-status">Belum diaktifkan</span>
+        </div>
+        <div id="controlMusicPlayer" style="width:min(480px,100%);height:270px;background:#000;border-radius:12px;overflow:hidden;margin-top:12px;"></div>
+        <p class="hint">Musik diputar oleh halaman Chrome ini. OBS hanya mengambil audio Chrome jika kamu menambahkan <b>Application Audio Capture</b>. Tidak perlu membuka halaman Music Player terpisah.</p>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <label>TEST MUSIC REQUEST</label>
+        <div class="row"><input id="musicTestQuery" type="text" placeholder="mis. Alan Walker Faded" style="flex:1"><button class="btn" onclick="testMusicRequest()">🎵 Request Test</button></div>
+      </div>
+      <div id="musicQueueList" class="log" style="max-height:240px;margin-top:14px;"></div>
+      <p class="hint">Catatan: kualitas video meminta mode <b>tiny/144p</b> bila YouTube menyediakan level tersebut. YouTube tetap dapat memilih kualitas adaptif sendiri. Untuk musik: biarkan audio berasal dari Chrome. Jangan mengaktifkan audio dari Browser Source OBS untuk musik.</p>
+    </div>
+  </section>
+
+  <!-- SIMULATOR -->
+  <section class="panel" id="tab-simulator">
+    <div class="display" style="font-size:18px;font-weight:700;">Panel Simulator</div>
+    <p class="hint">Tes workflow tanpa harus menunggu event TikTok asli. Event simulator tetap melewati custom action rules.</p>
+    <div class="row" style="gap:10px;flex-wrap:wrap;margin-top:14px;">
+      <button class="btn" onclick="simulateEvent('comment')">💬 Test Komentar</button><button class="btn" onclick="simulateTtsComment()">🗣️ Test Komentar + TTS</button>
+      <button class="btn" onclick="simulateEvent('like')">❤️ Like</button>
+      <button class="btn" onclick="simulateLikeLeaderboard()">🏆 Like + Leaderboard</button>
+      <button class="btn" onclick="simulateEvent('follow')">➕ Follow + SFX</button>
+      <button class="btn" onclick="simulateEvent('gift')">🎁 Gift + SFX</button>
+      <button class="btn" onclick="playLiveSfx('follow'); logEvent('Tes suara follow.mp3 diputar.')">🔊 Test Follow SFX</button>
+      <button class="btn" onclick="playLiveSfx('gift'); logEvent('Tes suara gift.mp3 diputar.')">🔊 Test Gift SFX</button>
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <label>CONTOH KOMENTAR</label>
+      <input id="simComment" value="halo, tes overlay!">
+    </div>
+    <div class="field">
+      <label>NAMA PENONTON</label>
+      <input id="simUsername" value="PenontonDemo">
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <label>SIMULASI LEADERBOARD LIKE</label>
+      <div class="row" style="gap:10px;flex-wrap:wrap;">
+        <input id="simLikeCount" type="number" min="1" value="25" style="max-width:150px;" placeholder="Jumlah like">
+        <button class="btn" onclick="simulateLikeLeaderboard()">❤️ Tambah Like &amp; Update Leaderboard</button>
+        <button class="btn" onclick="resetSimLeaderboard()">↺ Reset Leaderboard</button>
+      </div>
+      <p class="hint">Gunakan nama penonton di atas. Tombol ini menguji angka like sekaligus tampilan Browser Source leaderboard.</p>
+    </div>
+  </section>
+
+  <!-- OVERLAY PREVIEW -->
+  <section class="panel" id="tab-preview">
+    <div class="chat-live-panel">
+      <div class="preview-toolbar">
+        <div>
+          <div class="chat-live-kicker">WORKSPACE / CHAT LIVE</div>
+          <div class="chat-live-title">Live Chat</div>
+          <div class="hint" style="margin:4px 0 0;">Pantau komentar TikTok yang benar-benar masuk secara real-time.</div>
+        </div>
+        <div class="chat-live-actions">
+          <span class="chat-activity-status"><i></i> LIVE</span>
+          <button class="btn" onclick="document.getElementById('commentPreviewFrame').contentWindow.location.reload()">↻ Refresh</button>
+        </div>
+      </div>
+
+      <div class="live-chat-card">
+        <div class="live-chat-head">
+          <div>
+            <div class="chat-live-kicker">LIVE CHAT</div>
+            <div class="live-chat-title">Komentar Masuk</div>
+          </div>
+          <span class="live-chat-source">TikTok Live</span>
+        </div>
+        <div class="preview-wrap live-chat-preview-wrap">
+          <iframe id="commentPreviewFrame" class="preview-frame" src="/overlay-comments.html?preview=1" title="Live chat komentar TikTok"></iframe>
+        </div>
+      </div>
+    </div>
+
+  </section>
+
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="control.js" defer></script>
+
+    </div>
+  </main>
+</div>
+</body>
+</html>

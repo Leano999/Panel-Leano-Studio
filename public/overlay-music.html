@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OBS Music Request — Visual Only</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;font-family:Inter,Arial,sans-serif;color:#fff}*{box-sizing:border-box}
+#musicCard{position:fixed;right:32px;bottom:32px;width:min(430px,calc(100vw - 64px));padding:14px 16px;border:1px solid rgba(139,107,242,.45);border-radius:16px;background:linear-gradient(135deg,rgba(15,18,30,.94),rgba(29,23,50,.92));box-shadow:0 6px 18px rgba(0,0,0,.24);opacity:0;transform:translateY(12px);transition:opacity .35s ease,transform .35s ease}
+#musicCard.show{opacity:1;transform:translateY(0)}
+.header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px}.brand{font-size:11px;letter-spacing:2px;color:#b9b3d8;font-weight:700;text-transform:uppercase}.queueLabel{font-size:10px;color:#8f94aa;text-transform:uppercase;letter-spacing:1.4px;font-weight:700}
+.current{display:flex;gap:11px;align-items:center}.queue{margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}.queueTitle{font-size:10px;color:#b9b3d8;font-weight:700;text-transform:uppercase;letter-spacing:1.3px;margin-bottom:9px}.queueList{display:flex;flex-direction:column;gap:10px;max-height:300px;overflow:hidden}.queueRow{display:flex;align-items:center;gap:10px;min-width:0;padding:9px 11px;border-radius:12px;background:linear-gradient(135deg,rgba(255,255,255,.065),rgba(139,107,242,.06));border:1px solid rgba(255,255,255,.075);box-shadow:0 3px 10px rgba(0,0,0,.10)}.queueNo{width:24px;height:24px;display:grid;place-items:center;border-radius:8px;background:rgba(139,107,242,.22);color:#eee;font:800 11px monospace;flex:0 0 auto}.queueRow img{width:48px;height:28px;border-radius:5px;object-fit:cover;background:#0a0d14;flex:0 0 auto}.queueText{min-width:0}.queueSong{font-size:12px;color:#eee;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.queueBy{font-size:9px;color:#858aa0;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.thumb{width:70px;height:40px;border-radius:8px;object-fit:cover;background:#0a0d14;flex:0 0 auto}.title{font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.by{font-size:10px;color:#969bb0;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
+</head>
+<body>
+<div id="musicCard"><div class="header"><div class="brand">🎵 Music Request</div><div class="queueLabel">Next Up</div></div><div class="current"><img id="thumb" class="thumb" alt=""><div style="min-width:0"><div id="title" class="title">Belum ada lagu</div><div id="by" class="by">Request akan muncul di sini</div></div></div><div class="queue"><div class="queueTitle">Antrian Berikutnya <span id="queueCountLabel" style="float:right;opacity:.65;font-weight:600;letter-spacing:.5px"></span></div><div id="queueList" class="queueList"></div></div></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io({transports:['websocket']});
+const card=document.getElementById('musicCard'),titleEl=document.getElementById('title'),byEl=document.getElementById('by'),thumbEl=document.getElementById('thumb'),queueList=document.getElementById('queueList'),queueCountLabel=document.getElementById('queueCountLabel');
+function render(state){state=state||{};const current=state.current,q=Array.isArray(state.queue)?state.queue:[];queueCountLabel.textContent=q.length?`${q.length} lagu`:'';if(current){card.classList.add('show');titleEl.textContent=current.title||'Lagu';byEl.textContent=`Request @${current.requestedBy||'Penonton'} · ${current.duration||''}`;thumbEl.src=current.thumbnail||'';queueList.innerHTML=q.slice(0,5).map((item,i)=>`<div class="queueRow"><div class="queueNo">${i+1}</div>${item.thumbnail?`<img src="${escapeAttr(item.thumbnail)}" alt="">`:''}<div class="queueText"><div class="queueSong">${escapeHtml(item.title||'Lagu')}</div><div class="queueBy">Request @${escapeHtml(item.requestedBy||'Penonton')}</div></div></div>`).join('');}else{card.classList.remove('show');titleEl.textContent='Belum ada lagu';byEl.textContent='Request akan muncul di sini';thumbEl.removeAttribute('src');queueList.innerHTML='';queueCountLabel.textContent='';}}
+socket.on('music:update',render);socket.emit('music:state');
+function escapeHtml(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}function escapeAttr(s){return escapeHtml(s).replace(/`/g,'&#96;');}
+</script>
+</body></html>

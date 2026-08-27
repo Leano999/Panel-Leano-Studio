@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<title>Overlay Siaran</title>
+<style>
+:root{
+  --bg:#0A0D14;--panel:#131826;--panel-2:#171E2E;--line:#232B3D;
+  --text:#EDEFF5;--muted:#8792A8;--gold:#F2B807;--cyan:#34D6C4;
+  --magenta:#F23D6D;--violet:#8B6BF2;
+}
+</style>
+<style>
+  html, body{ background: transparent; overflow: hidden; width: 100vw; height: 100vh; }
+  body.theme-neon{ --overlay-bg1: rgba(9,12,25,.94); --overlay-bg2: rgba(20,15,45,.94); --overlay-line: rgba(139,107,242,.55); }
+  body.theme-bubble{ --overlay-bg1: rgba(255,255,255,.96); --overlay-bg2: rgba(245,247,255,.96); --overlay-line: rgba(139,107,242,.35); --text:#171826; --muted:#5d6475; }
+  body.theme-minimal{ --overlay-bg1: rgba(10,13,20,.88); --overlay-bg2: rgba(10,13,20,.88); --overlay-line: rgba(255,255,255,.18); }
+  body.theme-pink{ --overlay-bg1: rgba(35,10,25,.94); --overlay-bg2: rgba(50,14,38,.94); --overlay-line: rgba(242,61,109,.5); }
+  body.theme-glass{ --overlay-bg1: rgba(19,24,38,.92); --overlay-bg2: rgba(23,30,46,.92); --overlay-line: var(--line); }
+
+  #stage{contain:layout paint;
+    position: fixed; left: 0; bottom: 40px; width: 100%;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 10px;
+    padding-left: 40px;
+  }
+
+  .card{
+    position: relative;
+    display: flex; align-items: center; gap: 14px;
+    background: var(--overlay-bg1, rgba(19,24,38,.94));
+    border: 1px solid var(--overlay-line, var(--line));
+    border-left: 4px solid var(--accent);
+    border-radius: 10px;
+    padding: 14px 22px 14px 18px;
+    min-width: 320px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.18);
+    transform: none;
+    overflow: hidden;
+  }
+  .card .main{ font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:17px; margin-top:3px; }
+  .card .main b{ color: var(--accent); }
+  .card .sub{ color: var(--muted); font-size:13px; margin-top:2px; max-width: 360px; }
+  .card .icon{
+    width:38px; height:38px; border-radius:50%; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+    border: 1px solid var(--accent);
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; color: var(--accent);
+  }
+
+  /* Follow/Gift animated notifications */
+  #eventFx{contain:layout paint; position:fixed; inset:0; pointer-events:none; z-index:50; }
+  #eventFx.pos-top-center{ display:flex; align-items:flex-start; justify-content:center; padding-top:70px; }
+  #eventFx.pos-center{ display:flex; align-items:center; justify-content:center; }
+  #eventFx.pos-bottom-center{ display:flex; align-items:flex-end; justify-content:center; padding-bottom:110px; }
+  .fx-card{ position:relative; min-width:390px; max-width:min(680px,80vw); padding:14px 24px; border-radius:22px; display:flex; align-items:center; gap:16px; color:#fff; overflow:hidden; transform:translateY(-18px) scale(.88); opacity:0; box-shadow:0 2px 8px rgba(0,0,0,.18); border:1px solid rgba(255,255,255,.22); }
+  .fx-card.enter{ animation:fxEnter .55s cubic-bezier(.16,1,.3,1) forwards; }
+  .fx-card.leave{ animation:fxLeave .65s ease forwards; }
+  .fx-avatar{ width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none;font-size:28px;background:rgba(0,0,0,.28);border:2px solid rgba(255,255,255,.7);box-shadow:none; }
+  .fx-text{ min-width:0; text-align:left; }
+  .fx-kicker{ font:800 11px Inter,sans-serif; letter-spacing:2px; text-transform:uppercase; opacity:.9; }
+  .fx-user{ font:900 22px 'Space Grotesk',sans-serif; margin-top:2px; text-shadow:0 3px 14px rgba(0,0,0,.35); }
+  .fx-sub{ font:700 13px Inter,sans-serif; opacity:.95; margin-top:3px; }
+.fx-particle{display:none}
+  .fx-particle.p1{left:8%;top:20%;color:#25d9ff}.fx-particle.p2{left:23%;bottom:15%;color:#ff4fb3;animation-delay:.25s}.fx-particle.p3{right:17%;top:16%;color:#ffd44d;animation-delay:.5s}.fx-particle.p4{right:6%;bottom:22%;color:#8b6bf2;animation-delay:.8s}
+  .fx-wings{ background:linear-gradient(110deg,#0c1535,#322067 48%,#071c3d); border-color:#25d9ff; }
+  .fx-wings::before{ content:'✦  ♡  ✦'; position:absolute; inset:0; display:flex;align-items:center;justify-content:space-around; font-size:34px; color:#25d9ff; opacity:.16; }
+  .fx-neon{ background:linear-gradient(110deg,#090b18,#5b0b4f,#101c56); border-color:#ff3da8; box-shadow:0 0 45px rgba(255,61,168,.28),0 16px 60px rgba(0,0,0,.45); }
+  .fx-neon .fx-avatar{ border-color:#ff3da8; box-shadow:0 0 28px rgba(37,217,255,.65); }
+  .fx-cat{ background:linear-gradient(110deg,#071d38,#0e4d67,#172046); border-color:#25d9ff; }
+  .fx-cat::after{ content:'♫  ♥  ♪'; position:absolute; right:18px; top:8px; color:#25d9ff; opacity:.7; font-size:18px; }
+  .fx-treasure{ background:linear-gradient(110deg,#4d2400,#b86d05 45%,#512100); border-color:#ffd44d; box-shadow:0 0 48px rgba(255,192,51,.32),0 16px 60px rgba(0,0,0,.45); }
+  .fx-treasure .fx-avatar{ border-color:#ffd44d; }
+  .fx-rose{ background:linear-gradient(110deg,#4d071d,#c41f62 48%,#5a0a38); border-color:#ff76b7; box-shadow:0 0 48px rgba(255,77,165,.3),0 16px 60px rgba(0,0,0,.45); }
+  .fx-universe{ background:radial-gradient(circle at 80% 50%,#5c32d8,#151044 42%,#050718 85%); border-color:#9b8cff; box-shadow:0 0 52px rgba(139,107,242,.36),0 16px 60px rgba(0,0,0,.45); }
+  @keyframes fxEnter{ 0%{opacity:0;transform:translateY(-28px) scale(.82)} 70%{opacity:1;transform:translateY(5px) scale(1.035)} 100%{opacity:1;transform:translateY(0) scale(1)} }
+  @keyframes fxLeave{to{opacity:0;transform:translateY(-10px) scale(.99)}} } 50%{transform:translateY(-16px) scale(1.2);opacity:1} }
+
+  #ttsBubble{
+    position: fixed; left: 40px; top: 40px; max-width: 480px;
+    background: var(--overlay-bg1, rgba(19,24,38,.94));
+    border: 1px solid var(--overlay-line, var(--line)); border-left: 4px solid var(--violet);
+    border-radius: 10px; padding: 14px 20px; display:none;
+    font-family:'Inter',sans-serif; font-size:15px; color: var(--text);
+  }
+  #ttsBubble .tag{ font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:2px; color: var(--violet); display:block; margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<div id="stage"></div>
+<div id="eventFx" class="pos-top-center"></div>
+<div id="ttsBubble"><span class="tag">TTS</span><span id="ttsText"></span></div>
+<div id="goalOverlay" style="display:none;position:fixed;left:24px;right:24px;bottom:24px;max-width:520px;margin:auto;padding:12px 14px;
+  border:1px solid var(--overlay-line,var(--line));border-radius:14px;background:linear-gradient(100deg,var(--overlay-bg1,#131826),var(--overlay-bg2,#171e2e));
+  color:var(--text,#fff);font:700 12px Inter,system-ui,sans-serif;box-shadow:0 10px 30px rgba(0,0,0,.25)">
+  <div style="display:flex;justify-content:space-between"><span id="goalOverlayTitle">Live Goal</span><span id="goalOverlayCount">0 / 1000</span></div>
+  <div style="height:7px;background:#ffffff18;border-radius:99px;overflow:hidden;margin-top:9px"><div id="goalOverlayBar" style="height:100%;width:0%;background:linear-gradient(90deg,#8b6bf2,#25d9ff);transition:width .35s"></div></div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const socket = io({ transports: ['websocket'] });
+  const stage = document.getElementById('stage');
+
+  const MAX_COMMENT_CARDS = 8;
+
+  const CONFIG = {
+    follow:  { accent: 'var(--cyan)',    tag: 'FOLLOW',  icon: '+',  label: (u)=>`<b>${u}</b> mulai follow!` },
+    like:    { accent: 'var(--magenta)', tag: 'LIKE',    icon: '♥',  label: (u)=>`<b>${u}</b> mengirim like` },
+    gift:    { accent: 'var(--gold)',    tag: 'GIFT',    icon: '★',  label: (u)=>`<b>${u}</b> mengirim hadiah` },
+    comment: { accent: 'var(--violet)',  tag: 'COMMENT', icon: '“',  label: (u)=>`<b>${u}</b> berkomentar` },
+  };
+
+  // TTS auto-read toggles, synced from the control panel via the server.
+  let ttsSettings = { readComments: true, readLikes: true, voiceName: '', rate: 1, pitch: 1 };
+  let overlaySettings = { theme: 'glass', animations: { enabled:true, followStyle:'wings', giftStyle:'treasure', followDuration:4, giftDuration:5, position:'top-center' } };
+  let voices = [];
+  let lastLikeSpeech = 0;
+  let pendingLikes = 0;
+  let likeTimer = null;
+
+  socket.on('goal:update', (goal) => {
+    const el = document.getElementById('goalOverlay');
+    if(!goal || !goal.enabled){ el.style.display='none'; return; }
+    el.style.display='block';
+    document.getElementById('goalOverlayTitle').textContent = goal.title || 'Live Goal';
+    document.getElementById('goalOverlayCount').textContent = `${goal.current || 0} / ${goal.target || 1}`;
+    document.getElementById('goalOverlayBar').style.width = `${Math.min(100, ((goal.current || 0)/(goal.target || 1))*100)}%`;
+  });
+
+  socket.on('tts:settings', (settings) => {
+    ttsSettings = { ...ttsSettings, ...(settings || {}) };
+    if (speechSynthesis.paused) speechSynthesis.resume();
+  });
+
+  socket.on('overlay:settings', (settings) => {
+    overlaySettings = { ...overlaySettings, ...(settings || {}) };
+    applyTheme();
+  });
+
+  function applyTheme(){
+    document.body.classList.remove('theme-glass','theme-neon','theme-bubble','theme-minimal','theme-pink');
+    document.body.classList.add('theme-' + (overlaySettings.theme || 'glass'));
+  }
+
+  function loadVoices(){
+    voices = speechSynthesis.getVoices() || [];
+  }
+  loadVoices();
+  speechSynthesis.onvoiceschanged = loadVoices;
+  applyTheme();
+
+  socket.on('event', (payload) => {
+    if(!payload) return;
+
+    if(payload.kind === 'alert'){
+      if(payload.type !== 'follow' && payload.type !== 'gift'){
+        showAlert(payload);
+      }
+
+      // Live TTS is handled by the control panel after the user explicitly
+      // unlocks speech. Browser Sources are subject to autoplay restrictions.
+      if(payload.type === 'like' && ttsSettings.readLikes){
+        // TikTok likes can arrive very quickly. Aggregate them for a few seconds
+        // so TTS stays usable instead of talking over itself.
+        pendingLikes += Number(payload.count || 1);
+        clearTimeout(likeTimer);
+        likeTimer = setTimeout(() => {
+          const now = Date.now();
+          if(now - lastLikeSpeech < 2500){
+            likeTimer = setTimeout(() => speakLikes(), 2500);
+          } else {
+            speakLikes();
+          }
+        }, 700);
+      }
+    }
+    else if(payload.kind === 'sound') playSound(payload.id);
+    else if(payload.kind === 'tts' && payload.text) speak(payload.text);
+  });
+
+  function showAlert({ type, username, extra }){
+    const cfg = CONFIG[type];
+    if(!cfg) return;
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.style.setProperty('--accent', cfg.accent);
+    card.innerHTML = `
+      <div class="icon">${cfg.icon}</div>
+      <div>
+        <div class="tag">${cfg.tag}</div>
+        <div class="main">${cfg.label(username)}</div>
+        ${extra ? `<div class="sub">${escapeHtml(extra)}</div>` : ''}
+      </div>
+    `;
+    stage.appendChild(card);
+
+    if(type === 'comment'){
+      // Comments are permanent and stack vertically. Keep only the newest 8.
+      card.dataset.comment = '1';
+      while(stage.querySelectorAll('.card[data-comment="1"]').length > MAX_COMMENT_CARDS){
+        const oldest = stage.querySelector('.card[data-comment="1"]');
+        if(!oldest) break;
+        oldest.remove();
+      }
+      // IMPORTANT: no timeout for comments.
+      return;
+    }
+    setTimeout(() => card.remove(), 4600);
+  }
+
+
+  const eventFx = document.getElementById('eventFx');
+  function showEventFx({type, username, extra}){
+    const a = overlaySettings.animations || {};
+    eventFx.className = 'pos-' + (a.position || 'top-center');
+    const style = type === 'follow' ? (a.followStyle || 'wings') : (a.giftStyle || 'treasure');
+    const duration = type === 'follow' ? Number(a.followDuration || 4) : Number(a.giftDuration || 5);
+    const card = document.createElement('div');
+    card.className = `fx-card fx-${style}`;
+    const safeUser = escapeHtml(String(username || 'Penonton'));
+    const safeExtra = escapeHtml(String(extra || (type === 'follow' ? 'Baru saja follow!' : 'mengirim gift!')));
+    const icon = type === 'follow' ? '✦' : style === 'rose' ? '🌹' : style === 'universe' ? '🌌' : '🎁';
+    const kicker = type === 'follow' ? 'NEW FOLLOWER' : 'GIFT MASUK';
+    card.innerHTML = `<span class="fx-particle p1"></span><span class="fx-particle p2"></span><span class="fx-particle p3"></span><span class="fx-particle p4"></span><div class="fx-avatar">${icon}</div><div class="fx-text"><div class="fx-kicker">${kicker}</div><div class="fx-user">@${safeUser}</div><div class="fx-sub">${safeExtra}</div></div>`;
+    eventFx.appendChild(card);
+    card.classList.add('enter');
+    const stay = Math.max(2, Math.min(10, duration)) * 1000;
+    setTimeout(() => { card.classList.remove('enter'); card.classList.add('leave'); setTimeout(() => card.remove(), 700); }, Math.max(1200, stay - 700));
+  }
+
+  function escapeHtml(s){
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---- soundboard synth (mirrors control.html) ----
+  // Custom MP3 SFX first; fall back to built-in synth when no file exists.
+  const soundCache = {};
+  function playSound(id){
+    const safeId = String(id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId) return;
+    const url = `/sounds/${safeId}.mp3?v=13`;
+    try {
+      let audio = soundCache[safeId];
+      if (!audio) {
+        audio = new Audio(url);
+        audio.preload = 'auto';
+        audio.volume = 1;
+        soundCache[safeId] = audio;
+      }
+      audio.currentTime = 0;
+      const p = audio.play();
+      if (p && p.catch) p.catch(() => playSynth(safeId));
+    } catch(e) {
+      playSynth(safeId);
+    }
+  }
+
+  function playSynth(id){
+    const audio = new Audio(`/sounds/${encodeURIComponent(id)}.mp3`);
+    audio.volume = 1;
+    audio.play().catch(() => {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      function tone(freq, start, dur, type='sine', gain=0.2){
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type; o.frequency.value = freq;
+        g.gain.setValueAtTime(0, now+start);
+        g.gain.linearRampToValueAtTime(gain, now+start+0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, now+start+dur);
+        o.connect(g); g.connect(ctx.destination);
+        o.start(now+start); o.stop(now+start+dur+0.05);
+      }
+      if(id==='clap'){ for(let i=0;i<3;i++) tone(200+Math.random()*200, i*0.08, 0.06, 'square', 0.15); }
+      else if(id==='horn'){ tone(220,0,0.6,'sawtooth',0.18); tone(220,0.6,0.6,'sawtooth',0.18); }
+      else if(id==='ding'){ tone(880,0,0.5,'sine',0.2); tone(1320,0.05,0.4,'sine',0.12); }
+      else if(id==='drum'){ for(let i=0;i<10;i++) tone(80+i*4, i*0.05, 0.08, 'triangle', 0.15); }
+      else if(id==='boo'){ tone(180,0,0.5,'sawtooth',0.15); tone(140,0.3,0.6,'sawtooth',0.15); }
+      else if(id==='coin'){ tone(988,0,0.1,'square',0.15); tone(1319,0.1,0.25,'square',0.15); }
+    });
+  }
+
+  // ---- Reliable TTS queue ----
+  let ttsQueue = [];
+  let ttsBusy = false;
+  let ttsRetryTimer = null;
+  let ttsUnlocked = false;
+  let ttsPrimed = false;
+
+  function pickVoice(){
+    const wanted = String(ttsSettings.voiceName || '').trim();
+    if(wanted){
+      const exact = voices.find(v => v.name === wanted);
+      if(exact) return exact;
+    }
+    return voices.find(v => /^id-ID$/i.test(v.lang))
+      || voices.find(v => /^id/i.test(v.lang))
+      || voices.find(v => /google/i.test(v.name) && /^id/i.test(v.lang))
+      || voices.find(v => /^en-US$/i.test(v.lang))
+      || null;
+  }
+
+  function ensureVoices(){
+    voices = speechSynthesis.getVoices() || voices || [];
+    if(!voices.length) {
+      try { speechSynthesis.getVoices(); } catch(e) {}
+    }
+    return pickVoice();
+  }
+
+  function speak(text){
+    if(!text) return;
+    ttsQueue.push(String(text).slice(0, 500));
+    if(ttsQueue.length > 12) ttsQueue.shift();
+    processTtsQueue();
+  }
+
+  // Best-effort audio unlock. OBS Browser Source normally allows speech
+  // when its page has audio enabled; a manual interaction is still required
+  // by some Chromium builds.
+  function primeTts(){
+    try{
+      speechSynthesis.cancel();
+      speechSynthesis.resume();
+      const u = new SpeechSynthesisUtterance('');
+      u.volume = 0;
+      u.rate = 1;
+      u.onend = () => { ttsPrimed = true; };
+      u.onerror = () => {};
+      speechSynthesis.speak(u);
+      ttsUnlocked = true;
+    }catch(e){}
+  }
+
+  function processTtsQueue(){
+    if(ttsBusy || !ttsQueue.length) return;
+
+    const text = ttsQueue.shift();
+    const bubble = document.getElementById('ttsBubble');
+    document.getElementById('ttsText').textContent = text;
+    bubble.style.display = 'block';
+
+    try { speechSynthesis.resume(); } catch(e) {}
+
+    const voice = ensureVoices();
+    const u = new SpeechSynthesisUtterance(text);
+    if(voice){
+      u.voice = voice;
+      u.lang = voice.lang || 'id-ID';
+    } else {
+      u.lang = 'id-ID';
+    }
+    u.rate = Number(ttsSettings.rate) || 1;
+    u.pitch = Number(ttsSettings.pitch) || 1;
+
+    ttsBusy = true;
+    let finished = false;
+    const done = () => {
+      if(finished) return;
+      finished = true;
+      ttsBusy = false;
+      bubble.style.display = 'none';
+      clearTimeout(ttsRetryTimer);
+      setTimeout(processTtsQueue, 80);
+    };
+
+    u.onend = done;
+    u.onerror = (err) => {
+      // Some Chromium/OBS builds occasionally return 'interrupted' or
+      // 'not-allowed'. Retry once after refreshing the voice list.
+      if(err && (err.error === 'interrupted' || err.error === 'not-allowed' || err.error === 'audio-busy')){
+        ttsQueue.unshift(text);
+      }
+      done();
+    };
+
+    try {
+      speechSynthesis.cancel();
+      speechSynthesis.resume();
+      speechSynthesis.speak(u);
+
+      // Chrome can leave an utterance stuck in a non-speaking state.
+      ttsRetryTimer = setTimeout(() => {
+        if(!speechSynthesis.speaking && ttsBusy){
+          try { speechSynthesis.cancel(); } catch(e) {}
+          ttsBusy = false;
+          ttsQueue.unshift(text);
+          processTtsQueue();
+        }
+      }, 3500);
+    } catch(e) {
+      done();
+      setTimeout(processTtsQueue, 250);
+    }
+  }
+
+  speechSynthesis.onvoiceschanged = () => { ensureVoices(); };
+
+  // A browser-source page can still be subject to Chromium's autoplay/audio
+  // policy. Once the overlay has any user interaction, remember that it is unlocked.
+  window.addEventListener('pointerdown', () => {
+    ttsUnlocked = true;
+    primeTts();
+    try { speechSynthesis.resume(); } catch(e) {}
+  }, {passive:true});
+
+  // Try once automatically on load. This works in OBS builds that do not
+  // enforce a user-gesture requirement for Browser Source speech.
+  // TTS is primed only after an explicit browser interaction.
+
+</script>
+</body>
+</html>

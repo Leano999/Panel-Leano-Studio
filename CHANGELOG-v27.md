@@ -1,0 +1,1 @@
+v27: Music Request overlay now visibly renders up to 5 queued songs as separate bubble rows; queue items 1-5 are shown, items 6+ stay hidden until earlier songs finish. Improved spacing, numbering, thumbnails, and queue visibility label. Browser Source URLs bumped to v27.

@@ -1,0 +1,353 @@
+:root{
+  --bg: #0A0D14;
+  --panel: #131826;
+  --panel-2: #171E2E;
+  --line: #232B3D;
+  --text: #EDEFF5;
+  --muted: #8792A8;
+  --gold: #F2B807;    /* gift */
+  --cyan: #34D6C4;    /* follow */
+  --magenta: #F23D6D; /* like */
+  --violet: #8B6BF2;  /* comment / TTS */
+  --radius: 10px;
+}
+
+*{ box-sizing: border-box; }
+html,body{ margin:0; padding:0; }
+
+body{
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono{ font-family: 'JetBrains Mono', monospace; }
+.display{ font-family: 'Space Grotesk', sans-serif; }
+
+::selection{ background: var(--violet); color: #fff; }
+
+a{ color: inherit; }
+
+/* scrollbar, kept quiet */
+::-webkit-scrollbar{ width: 8px; height: 8px; }
+::-webkit-scrollbar-track{ background: transparent; }
+::-webkit-scrollbar-thumb{ background: var(--line); border-radius: 8px; }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+}
+
+
+/* =========================================================
+   PANEL LEANO V28 — polished "desktop window" interface
+   ========================================================= */
+
+body{
+  background:
+    radial-gradient(circle at 8% 0%, rgba(139,107,242,.12), transparent 30%),
+    radial-gradient(circle at 92% 12%, rgba(52,214,196,.08), transparent 26%),
+    var(--bg);
+}
+
+.shell{
+  max-width: 1180px;
+  padding: 34px 24px 90px;
+}
+
+/* Header / title */
+header.deck{
+  position: relative;
+  overflow: hidden;
+  min-height: 112px;
+  padding: 26px 26px 24px 32px;
+  border-radius: 18px;
+  border-color: #2b3550;
+  background:
+    linear-gradient(135deg, rgba(25,31,48,.98), rgba(16,21,34,.98)),
+    var(--panel);
+  box-shadow: 0 20px 55px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+header.deck::after{
+  content:"";
+  position:absolute;
+  inset:auto -15% -80px 35%;
+  height:150px;
+  background: radial-gradient(circle, rgba(139,107,242,.16), transparent 68%);
+  pointer-events:none;
+}
+
+.window-chrome{
+  position:absolute;
+  top:14px;
+  left:18px;
+  display:flex;
+  gap:6px;
+}
+.window-chrome span{
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#3a4560;
+}
+.window-chrome span:nth-child(2){ background:#4a5672; }
+.window-chrome span:nth-child(3){ background:#596782; }
+
+.brand{
+  position:relative;
+  z-index:1;
+  gap:18px;
+}
+.brand .name{
+  font-family:'Space Grotesk',sans-serif;
+  font-size: clamp(28px, 4vw, 43px);
+  line-height:.98;
+  font-weight:800;
+  letter-spacing:-1.7px;
+  text-transform:uppercase;
+}
+.brand .name-panel{ color:var(--text); }
+.brand .name-leano{
+  color:#a995ff;
+  text-shadow:0 0 24px rgba(139,107,242,.25);
+}
+.brand .name-studio{
+  color:#65718a;
+  font-size:.45em;
+  letter-spacing:2px;
+  margin-left:6px;
+}
+.brand .sub{
+  margin-top:9px;
+  color:#8f9ab0;
+  font-size:12px;
+  letter-spacing:.15px;
+}
+
+.status{
+  position:relative;
+  z-index:1;
+  padding:9px 12px;
+  border:1px solid #2b3550;
+  border-radius:999px;
+  background:rgba(8,11,18,.45);
+}
+.status span{ letter-spacing:1.2px; }
+
+/* OBS URL cards */
+.url-box{
+  position:relative;
+  padding:11px 13px;
+  margin-bottom:10px !important;
+  border:1px solid rgba(42,52,76,.9);
+  border-radius:12px;
+  background:rgba(19,24,38,.72);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+}
+.url-box b{
+  color:#cdd4e3;
+  font-size:11px;
+  letter-spacing:.7px;
+}
+.url-box code{
+  flex:1;
+  min-width:180px;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  background:#0b0f18;
+}
+
+/* App-style tabs / "window" sections */
+nav.tabs.app-tabs{
+  position:sticky;
+  top:10px;
+  z-index:20;
+  display:flex;
+  gap:5px;
+  margin:24px 0 18px;
+  padding:7px;
+  border:1px solid #2b3550;
+  border-radius:15px;
+  background:rgba(14,18,29,.90);
+  backdrop-filter:blur(18px);
+  box-shadow:0 12px 30px rgba(0,0,0,.20);
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+nav.tabs.app-tabs::-webkit-scrollbar{ display:none; }
+
+nav.tabs.app-tabs button{
+  flex:0 0 auto;
+  margin:0;
+  padding:10px 15px;
+  border:1px solid transparent;
+  border-radius:10px;
+  color:#7f8aa1;
+  font-size:13px;
+  font-weight:650;
+  letter-spacing:.05px;
+  transition:all .18s ease;
+}
+nav.tabs.app-tabs button:hover{
+  color:#dfe4ef;
+  background:#171e2e;
+}
+nav.tabs.app-tabs button.active{
+  color:#f4f6fb;
+  border-color:#303b58;
+  background:linear-gradient(180deg,#252d42,#1b2233);
+  box-shadow:0 5px 14px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.045);
+}
+nav.tabs.app-tabs button.active::after{
+  content:"";
+  display:block;
+  width:18px;
+  height:2px;
+  margin:6px auto -4px;
+  border-radius:2px;
+  background:var(--violet);
+  box-shadow:0 0 10px rgba(139,107,242,.55);
+}
+
+/* Make the currently open section feel like a window/content pane */
+.panel.active{
+  animation:panelIn .18s ease-out;
+}
+@keyframes panelIn{
+  from{ opacity:.55; transform:translateY(3px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+
+/* Cards */
+.strip{
+  border-radius:14px;
+  background:linear-gradient(145deg,rgba(21,27,43,.98),rgba(16,21,34,.98));
+  border-color:#28324a;
+  box-shadow:0 10px 25px rgba(0,0,0,.12), inset 0 1px 0 rgba(255,255,255,.025);
+}
+.strip .title{
+  font-size:22px;
+  letter-spacing:-.4px;
+}
+.strip .desc{ color:#7e8aa1; }
+
+.field{
+  padding:16px;
+  border:1px solid #28324a;
+  border-radius:14px;
+  background:rgba(19,24,38,.72);
+}
+.field > label:first-child{
+  color:#9ba7bd;
+  letter-spacing:1px;
+}
+.field input[type=text],
+.field textarea,
+.field select,
+.field input[type=number]{
+  border-color:#2a3550;
+  background:#0e1320;
+  color: var(--text);
+  border-radius:10px;
+  outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+.field input[type=text]::placeholder,
+.field input[type=number]::placeholder,
+.field textarea::placeholder{
+  color: var(--muted);
+  opacity: 1;
+}
+.field input[type=text]:focus,
+.field textarea:focus,
+.field select:focus,
+.field input[type=number]:focus{
+  border-color:#6652bb;
+  box-shadow:0 0 0 3px rgba(139,107,242,.10);
+}
+
+/* Modern sliding ON/OFF switch.
+   OFF = knob left, ON = knob right. */
+.switch{
+  position:relative;
+  display:inline-flex;
+  align-items:center;
+  width:52px;
+  height:30px;
+  flex:0 0 52px;
+  padding:0;
+  margin:0 2px 0 0;
+  border:1px solid #313b54;
+  border-radius:999px;
+  background:#111725;
+  box-shadow:inset 0 2px 5px rgba(0,0,0,.25), 0 1px 0 rgba(255,255,255,.025);
+  cursor:pointer;
+  transition:background .2s ease, border-color .2s ease, box-shadow .2s ease;
+  vertical-align:middle;
+}
+.switch::after{
+  content:"";
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  background:#dfe4ee;
+  box-shadow:0 2px 5px rgba(0,0,0,.35);
+  transition:transform .22s cubic-bezier(.2,.8,.2,1), background .2s;
+}
+.switch.is-on{
+  border-color:#6754c4;
+  background:linear-gradient(135deg,#725de0,#8b6bf2);
+  box-shadow:0 0 18px rgba(139,107,242,.18), inset 0 1px 0 rgba(255,255,255,.14);
+}
+.switch.is-on::after{
+  transform:translateX(22px);
+  background:#fff;
+}
+.switch input[type="checkbox"]{
+  position:absolute !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  opacity:0 !important;
+  cursor:pointer !important;
+  z-index:2;
+}
+
+/* Labels containing a switch */
+label:has(.switch){
+  cursor:pointer;
+}
+label:has(.switch) .switch{
+  margin-right:3px;
+}
+
+/* Buttons */
+.btn{
+  border-color:#303a53;
+  border-radius:9px;
+  background:linear-gradient(180deg,#1b2233,#151b29);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035);
+}
+.btn:hover{
+  border-color:#5b4bab;
+  background:#1d2538;
+}
+
+/* Mobile */
+@media (max-width: 700px){
+  .shell{ padding:20px 12px 60px; }
+  header.deck{ padding:29px 18px 20px; }
+  .brand .name{ font-size:30px; letter-spacing:-1px; }
+  .brand .name-studio{ display:block; margin:5px 0 0; }
+  .status{ display:none; }
+  .url-box{ align-items:flex-start; flex-wrap:wrap; }
+  .url-box b{ min-width:100% !important; }
+  .url-box code{ min-width:0; width:100%; }
+  nav.tabs.app-tabs{ top:5px; }
+}

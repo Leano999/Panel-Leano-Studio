@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Browser Source — KOMENTAR LIVE (Permanen)</title>
+<style>
+:root{
+  --line:#232B3D;--text:#EDEFF5;--muted:#8792A8;--panel-2:#171E2E;
+  --gold:#F2B807;--cyan:#34D6C4;--magenta:#F23D6D;--violet:#8B6BF2;
+}
+</style>
+<style>
+html,body{background:transparent;overflow:hidden;width:100vw;height:100vh;margin:0}
+:root{--chat-left:32px;--chat-right:32px;--chat-bottom:32px;--chat-gap:16px}
+#feed{contain:layout paint;
+ position:fixed;left:var(--chat-left);right:var(--chat-right);bottom:var(--chat-bottom);
+ width:min(680px,calc(100vw - 64px));display:flex;flex-direction:column;gap:var(--chat-gap);
+ padding:4px;overflow:hidden;box-sizing:border-box;
+}
+.bubble{
+ flex:0 0 auto;align-self:flex-start;width:fit-content;max-width:min(680px,calc(100vw - 64px));display:flex;align-items:flex-start;gap:10px;
+ background:var(--overlay-bg1,rgba(19,24,38,.94));
+ border:1px solid var(--overlay-line,var(--line));border-left:3px solid var(--violet);
+ border-radius:12px;padding:11px 14px;box-sizing:border-box;
+ opacity:1;transform:none;
+ box-shadow:0 2px 8px rgba(0,0,0,.16);
+}
+}
+.avatar{flex-shrink:0;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--panel-2);border:1px solid var(--line);font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:12px;color:var(--violet)}
+.content{min-width:0}.uname{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13px;color:var(--violet);margin-bottom:2px}.text{font-family:'Inter',sans-serif;font-size:14px;color:var(--text);line-height:1.4;word-break:break-word}
+/* Structural chat styles — not just color swaps */
+body.chat-pill .bubble{border:1px solid var(--overlay-line);border-left:1px solid var(--overlay-line);border-radius:999px;padding:8px 15px;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+body.chat-pill .avatar{width:28px;height:28px}
+body.chat-pill .content{display:flex;align-items:baseline;gap:8px;min-width:0}
+body.chat-pill .uname{margin:0;white-space:nowrap}
+body.chat-pill .text{overflow:visible;text-overflow:clip;white-space:normal;word-break:break-word}
+
+body.chat-speech .bubble{position:relative;border:1px solid var(--overlay-line);border-radius:18px;padding:12px 16px 12px 14px;box-shadow:0 2px 8px rgba(0,0,0,.14)}
+body.chat-speech .bubble:after{content:"";position:absolute;left:22px;bottom:-8px;width:14px;height:14px;background:var(--overlay-bg2);border-right:1px solid var(--overlay-line);border-bottom:1px solid var(--overlay-line);transform:rotate(45deg)}
+body.chat-speech .avatar{border-radius:10px}
+
+body.chat-stacked .bubble{border:0;border-left:4px solid var(--violet);border-radius:8px;background:rgba(8,12,22,.72);padding:10px 14px 11px 12px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+body.chat-stacked .uname{display:inline-block;background:rgba(139,107,242,.14);padding:2px 7px;border-radius:6px;margin-bottom:5px}
+body.chat-stacked .avatar{border-radius:8px}
+
+body.chat-neon-line .bubble{border:0;border-radius:5px;background:rgba(7,10,18,.78);padding:9px 12px;position:relative;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,.16)}
+body.chat-neon-line .bubble:before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--cyan),var(--violet),var(--magenta));box-shadow:none}
+body.chat-neon-line .uname{color:var(--cyan);text-transform:uppercase;letter-spacing:.03em;font-size:11px}
+body.chat-neon-line .avatar{border:0;background:rgba(52,214,196,.12);color:var(--cyan)}
+
+body.chat-compact .bubble{border:1px solid var(--overlay-line);border-radius:7px;padding:7px 10px;gap:8px;box-shadow:none}
+body.chat-compact .avatar{width:24px;height:24px;font-size:10px}
+body.chat-compact .uname{font-size:12px;margin-bottom:1px}.chat-compact .text{font-size:13px}
+
+body.theme-neon{--overlay-bg1:rgba(9,12,25,.94);--overlay-bg2:rgba(20,15,45,.94);--overlay-line:rgba(139,107,242,.55)}
+body.theme-bubble{--overlay-bg1:rgba(255,255,255,.96);--overlay-bg2:rgba(245,247,255,.96);--overlay-line:rgba(139,107,242,.35);--text:#171826;--muted:#5d6475}
+body.theme-minimal{--overlay-bg1:rgba(10,13,20,.88);--overlay-bg2:rgba(10,13,20,.88);--overlay-line:rgba(255,255,255,.18)}
+body.theme-pink{--overlay-bg1:rgba(35,10,25,.94);--overlay-bg2:rgba(50,14,38,.94);--overlay-line:rgba(242,61,109,.5)}
+body.theme-glass{--overlay-bg1:rgba(19,24,38,.9);--overlay-bg2:rgba(23,30,46,.9);--overlay-line:rgba(139,107,242,.35)}
+</style>
+</head>
+<body class="theme-glass">
+<div id="feed"></div>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const socket=io({ transports: ['websocket'] });
+const feed=document.getElementById('feed');
+const MAX_VISIBLE_COMMENTS=8;
+const STORAGE_KEY='panel-siar:comments:v11';
+
+function initials(name){
+ const s=String(name||'Penonton').trim();
+ return s ? s.slice(0,2).toUpperCase() : 'PE';
+}
+function safeItems(items){
+ return (Array.isArray(items)?items:[]).filter(x=>x && String(x.extra||'').trim()).slice(-MAX_VISIBLE_COMMENTS);
+}
+function saveHistory(){
+ const items=[...feed.querySelectorAll('.bubble')].map(b=>({
+   username:b.dataset.username||'Penonton',
+   extra:b.dataset.extra||'',
+   at:Number(b.dataset.at)||Date.now()
+ }));
+ try{localStorage.setItem(STORAGE_KEY,JSON.stringify(items.slice(-MAX_VISIBLE_COMMENTS)))}catch(e){}
+}
+function addComment(username,text,animate=true,at=Date.now()){
+ text=String(text||'').trim(); if(!text)return;
+ const bubble=document.createElement('div');
+ bubble.className='bubble';
+ bubble.dataset.username=String(username||'Penonton');
+ bubble.dataset.extra=text;
+ bubble.dataset.at=String(at||Date.now());
+ if(!animate) bubble.style.animation='none';
+
+ const avatar=document.createElement('div'); avatar.className='avatar'; avatar.textContent=initials(username);
+ const content=document.createElement('div'); content.className='content';
+ const uname=document.createElement('div'); uname.className='uname'; uname.textContent=username||'Penonton';
+ const msg=document.createElement('div'); msg.className='text'; msg.textContent=text;
+ content.append(uname,msg); bubble.append(avatar,content); feed.appendChild(bubble);
+
+ while(feed.children.length>MAX_VISIBLE_COMMENTS) feed.removeChild(feed.firstElementChild);
+ saveHistory();
+}
+function rebuild(items){
+ feed.innerHTML='';
+ safeItems(items).forEach(x=>addComment(x.username,x.extra,false,x.at));
+ saveHistory();
+}
+function loadLocal(){
+ try{
+  const x=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+  if(x.length) rebuild(x);
+ }catch(e){}
+}
+socket.on('comments:reset',()=>{
+ feed.innerHTML='';
+ try{localStorage.removeItem(STORAGE_KEY)}catch(e){}
+});
+socket.on('comments:history',items=>rebuild(items));
+socket.on('event',p=>{
+ if(p && p.kind==='alert' && p.type==='comment') addComment(p.username,p.extra,true,p.at||Date.now());
+});
+socket.on('overlay:settings',settings=>{
+ document.body.classList.remove('theme-glass','theme-neon','theme-bubble','theme-minimal','theme-pink','chat-glass-card','chat-pill','chat-speech','chat-stacked','chat-neon-line','chat-compact');
+ document.body.classList.add('theme-'+((settings&&settings.theme)||'glass'));
+ const chat=(settings&&settings.chat)||{};
+ document.body.classList.add('chat-'+(chat.style||'glass-card'));
+ document.documentElement.style.setProperty('--chat-gap',(Number(chat.gap)||16)+'px');
+});
+loadLocal();
+</script>
+</body>
+</html>
