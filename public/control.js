@@ -473,7 +473,7 @@
   // gift-price roundups, not a live/official feed. Use "Lainnya" to type
   // any gift name manually if it's not listed here, the price has since
   // changed, or the exact name TikTok sends doesn't match what's shown.
-  const KNOWN_GIFTS = [
+  const KNOWN_GIFTS_FALLBACK = [
     { name: 'Rose', label: 'Rose (Mawar)', coins: 1 },
     { name: 'TikTok', label: 'TikTok', coins: 1 },
     { name: 'GG', label: 'GG', coins: 1 },
@@ -481,6 +481,7 @@
     { name: 'Football', label: 'Football (Sepak Bola)', coins: 1 },
     { name: 'Mini Speaker', label: 'Mini Speaker (Speaker Mini)', coins: 1 },
     { name: 'Ice Cream Cone', label: 'Ice Cream Cone (Kerucut Es Krim)', coins: 1 },
+    { name: 'Heart Me', label: 'Heart Me', coins: 1 },
     { name: 'Hi', label: 'Hi', coins: 5 },
     { name: 'Finger Heart', label: 'Finger Heart (Jari Hati)', coins: 5 },
     { name: 'Mic', label: 'Mic', coins: 5 },
@@ -489,7 +490,7 @@
     { name: 'Doughnut', label: 'Doughnut (Donat)', coins: 30 },
     { name: 'Mirror', label: 'Mirror (Cermin)', coins: 30 },
     { name: 'Little Crown', label: 'Little Crown (Mahkota)', coins: 99 },
-    { name: 'Heart Me', label: 'Heart Me (Hati)', coins: 100 },
+    { name: 'Heart', label: 'Heart (Hati)', coins: 100 },
     { name: 'Confetti', label: 'Confetti (Konfeti)', coins: 100 },
     { name: 'Kiss', label: 'Kiss (Ciuman)', coins: 150 },
     { name: 'Butterfly', label: 'Butterfly (Kupu-kupu)', coins: 169 },
@@ -512,6 +513,37 @@
     { name: 'Lion', label: 'Lion (Singa)', coins: 29999 },
     { name: 'Universe', label: 'TikTok Universe', coins: 44999 },
   ];
+
+  // Gifts actually seen arriving from a real TikTok Live session, reported
+  // by the server (server.js -> "gifts:known"). This is 100% accurate
+  // (real name + real coin cost, straight from TikTok), unlike the curated
+  // fallback list above which is just a best-effort guess. Once a gift has
+  // been seen live, it's shown first and marked "terdeteksi live" so it's
+  // obviously the trustworthy entry if it also happens to be in the
+  // fallback list under a different price/spelling.
+  let discoveredGifts = [];
+  socket.on('gifts:known', (list) => {
+    discoveredGifts = Array.isArray(list) ? list : [];
+    renderActions();
+  });
+
+  function mergedGiftList(){
+    const seen = new Set();
+    const merged = [];
+    discoveredGifts.forEach(g => {
+      const key = String(g.name||'').toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      merged.push({ name: g.name, label: `${g.name} ✓ terdeteksi live`, coins: g.coins });
+    });
+    KNOWN_GIFTS_FALLBACK.forEach(g => {
+      const key = g.name.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(g);
+    });
+    return merged;
+  }
   let actionRules = [];
   function addAction(){
     actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!', key:'', holdMs:0 });
@@ -542,12 +574,13 @@
       // approximate coin price (like Indofinity), with a "Lainnya" fallback
       // that reveals a manual text input for anything not listed or if the
       // price has since changed.
-      const matchesKnownGift = KNOWN_GIFTS.some(g => g.name.toLowerCase() === String(a.keyword||'').toLowerCase());
+      const giftOptions = mergedGiftList();
+      const matchesKnownGift = giftOptions.some(g => g.name.toLowerCase() === String(a.keyword||'').toLowerCase());
       const isCustomGift = isGiftEvent && a.keyword && !matchesKnownGift;
       const keywordHtml = isGiftEvent
         ? `<select data-i="${i}" data-k="keywordSelect" style="flex:1;min-width:220px;">
              <option value="" ${!a.keyword?'selected':''}>-- Semua gift --</option>
-             ${KNOWN_GIFTS.map(g => `<option value="${escapeHtml(g.name)}" ${g.name.toLowerCase()===String(a.keyword||'').toLowerCase()?'selected':''}>${escapeHtml(g.label)} — ${g.coins.toLocaleString('id-ID')} koin</option>`).join('')}
+             ${giftOptions.map(g => `<option value="${escapeHtml(g.name)}" ${g.name.toLowerCase()===String(a.keyword||'').toLowerCase()?'selected':''}>${escapeHtml(g.label)} — ${g.coins.toLocaleString('id-ID')} koin</option>`).join('')}
              <option value="__custom__" ${isCustomGift?'selected':''}>Lainnya (ketik manual)...</option>
            </select>
            ${isCustomGift ? `<input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="nama gift manual" style="flex:1;min-width:150px;">` : ''}`

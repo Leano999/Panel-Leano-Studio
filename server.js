@@ -275,6 +275,25 @@ function scheduleLiveStateBroadcast() {
   }, 250);
 }
 
+// Auto-learned gift catalog: instead of guessing gift names/coin prices
+// (TikTok has no public "list all gifts" API and prices change), we just
+// remember every real gift name + coin cost that actually arrives from
+// TikTok during a live session. This is guaranteed accurate because it's
+// the exact data TikTok itself sent - no guesswork. Resets on server
+// restart, same as the other in-memory settings in this file.
+let discoveredGifts = new Map(); // giftName (lowercase) -> { name, coins }
+
+function rememberGift(giftName, coinsPerUnit) {
+  const name = String(giftName || "").trim();
+  if (!name) return;
+  const key = name.toLowerCase();
+  const coins = Math.max(0, Number(coinsPerUnit) || 0);
+  const existing = discoveredGifts.get(key);
+  if (existing && existing.coins === coins) return; // no change, skip broadcast
+  discoveredGifts.set(key, { name, coins });
+  io.emit("gifts:known", [...discoveredGifts.values()]);
+}
+
 let customActions = [
   {
     id: "follow-sfx",
@@ -303,6 +322,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("actions:get", () => socket.emit("actions:list", customActions));
+  socket.emit("gifts:known", [...discoveredGifts.values()]);
   socket.on("actions:save", (actions = []) => {
     customActions = Array.isArray(actions) ? actions.slice(0, 50).map(normalizeAction) : [];
     io.emit("actions:list", customActions);
@@ -544,7 +564,17 @@ function processEvent(payload = {}, meta = {}) {
       io.emit("event", { kind: "leaderboard", top });
     }
     if (payload.type === "follow") streamStats.follows += 1;
-    if (payload.type === "gift") streamStats.gifts += 1;
+    if (payload.type === "gift") {
+      streamStats.gifts += 1;
+      // Remember this gift's real name + coin cost per unit (payload.coins
+      // is already multiplied by count, so divide back down) so the
+      // Custom Events gift dropdown can offer it going forward.
+      if (payload.giftName) {
+        const count = Math.max(1, Number(payload.count) || 1);
+        const perUnitCoins = Number(payload.coins || 0) / count;
+        rememberGift(payload.giftName, perUnitCoins);
+      }
+    }
 
     // Keep the current goal synchronized with the selected event.
     if (goalSettings.enabled) {
