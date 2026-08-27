@@ -459,7 +459,7 @@
   // ---- Custom actions ----
   let actionRules = [];
   function addAction(){
-    actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!' });
+    actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!', key:'', holdMs:0 });
     renderActions();
   }
   function renderActions(){
@@ -473,6 +473,14 @@
       const wrap = document.createElement('div');
       wrap.className = 'field';
       wrap.style.marginTop = '12px';
+      const isKeypress = a.action === 'keypress';
+      // For "keypress" we swap the generic free-text value field for a
+      // key-name input + a hold-duration (ms) input, since a keypress rule
+      // needs both pieces of info instead of one text value.
+      const actionValueHtml = isKeypress
+        ? `<input data-i="${i}" data-k="key" value="${escapeHtml(a.key||'')}" placeholder="tombol, contoh: Y" style="flex:1;min-width:90px;text-transform:uppercase;">
+           <input data-i="${i}" data-k="holdMs" type="number" min="0" max="10000" step="50" value="${Number(a.holdMs)||0}" placeholder="tahan (ms)" style="flex:1;min-width:110px;">`
+        : `<input data-i="${i}" data-k="value" value="${escapeHtml(a.value)}" placeholder="aksi / teks / sound id" style="flex:2;min-width:200px;">`;
       wrap.innerHTML = `
         <div class="row" style="gap:8px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" data-i="${i}" data-k="enabled" ${a.enabled?'checked':''}> ON</label>
@@ -482,20 +490,23 @@
             <option value="follow" ${a.event==='follow'?'selected':''}>Follow</option>
             <option value="gift" ${a.event==='gift'?'selected':''}>Gift</option>
           </select>
-          <input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="keyword (kosong = semua)" style="flex:1;min-width:150px;">
+          <input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="keyword (kosong = semua), contoh: heart me" style="flex:1;min-width:150px;">
           <select data-i="${i}" data-k="action" style="width:120px;">
             <option value="tts" ${a.action==='tts'?'selected':''}>TTS</option>
             <option value="alert" ${a.action==='alert'?'selected':''}>Alert</option>
             <option value="sound" ${a.action==='sound'?'selected':''}>Sound</option>
+            <option value="keypress" ${isKeypress?'selected':''}>Keypress</option>
           </select>
-          <input data-i="${i}" data-k="value" value="${escapeHtml(a.value)}" placeholder="aksi / teks / sound id" style="flex:2;min-width:200px;">
+          ${actionValueHtml}
           <button class="btn" data-remove="${i}">Hapus</button>
-        </div>`;
+        </div>
+        ${isKeypress ? '<div class="hint" style="margin-top:6px;">Keypress cuma jalan kalau panel dijalankan lokal (START PANEL.bat), tidak di Railway. Durasi tahan 0 = ketuk cepat.</div>' : ''}`;
       root.appendChild(wrap);
     });
     root.querySelectorAll('[data-i][data-k]').forEach(el => el.addEventListener('input', () => {
       const i = Number(el.dataset.i), k = el.dataset.k;
-      actionRules[i][k] = el.type === 'checkbox' ? el.checked : el.value;
+      actionRules[i][k] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) || 0 : el.value);
+      if (k === 'action') renderActions(); // switch value field <-> key/hold fields
     }));
     root.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
       actionRules.splice(Number(el.dataset.remove), 1); renderActions();
