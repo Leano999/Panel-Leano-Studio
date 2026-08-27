@@ -1,19 +1,34 @@
-# v45 — Fitur Keypress dari Gift/Event
+# v45 — Fitur Keypress dari Gift/Event + Dropdown Nama Gift
 
 ## Apa yang baru
-Sekarang di tab **Custom Action Events** ada pilihan aksi baru: **Keypress**.
-Ini bikin panel bisa "menekan" tombol keyboard beneran di komputer kamu
-setiap kali event tertentu terjadi (gift, follow, like, atau komentar).
+Sekarang di tab **Custom Action Events** ada 2 tambahan:
 
-Contoh pemakaian:
-- Event: `Gift`, Keyword: `heart me`, Aksi: `Keypress`, Tombol: `Y`, Tahan (ms): `0`
-  → setiap ada yang kasih gift "Heart Me", tombol Y otomatis diketuk sekali.
-- Event: `Gift`, Keyword: `rose`, Aksi: `Keypress`, Tombol: `J`, Tahan (ms): `1500`
-  → setiap ada gift Rose/Mawar, tombol J ditekan dan **ditahan 1.5 detik**
-  sebelum dilepas lagi.
+1. **Dropdown nama gift** — kalau kamu pilih Event: `Gift`, kolom keyword
+   berubah jadi dropdown berisi nama-nama gift TikTok yang umum (Rose,
+   Heart Me, GG, Ice Cream Cone, dll), persis kayak di Indofinity. Kalau
+   nama gift yang kamu mau nggak ada di daftar, pilih **"Lainnya (ketik
+   manual)"** dan ketik sendiri nama gift-nya.
+2. **Aksi Keypress** — pilihan aksi baru selain TTS/Alert/Sound. Begitu
+   dipilih, muncul kolom "tombol" dan "tahan (ms)".
 
-Kamu bisa tambahkan rule sebanyak yang kamu mau (satu gift bisa beda tombol,
-beda durasi tahan) lewat tombol **"+ Tambah Event"** yang sudah ada.
+## Soal daftar gift & harga koin
+TikTok **tidak punya API resmi** untuk "daftar semua gift beserta harganya",
+jadi dropdown ini disusun manual dari rangkuman harga gift TikTok 2026 yang
+beredar publik. Beberapa catatan penting:
+
+- Harga koin & ketersediaan gift **bisa berubah sewaktu-waktu** dari pihak
+  TikTok, jadi anggap angka koin di dropdown sebagai perkiraan, bukan
+  harga resmi real-time.
+- Nama yang dipakai untuk **pencocokan/matching** di sistem adalah nama
+  gift versi Inggris (misal `Rose`, `Perfume`, `Doughnut`), karena itu yang
+  dikirim oleh TikTok lewat koneksi live — walaupun di aplikasi TikTok
+  sendiri kamu lihat labelnya dalam Bahasa Indonesia (misal "Mawar").
+  Dropdown menampilkan kedua nama sekaligus biar gampang dikenali.
+- Kalau gift yang kamu mau nggak ada di daftar, atau ternyata nama yang
+  dikirim TikTok beda dari yang ada di dropdown, pilih **"Lainnya (ketik
+  manual)"** dan ketik nama gift sesuai yang muncul di log/komentar
+  overlay kamu saat live.
+
 
 ## Cara kerja (penting dibaca)
 Fitur ini pakai library `@nut-tree-fork/nut-js` untuk mensimulasikan

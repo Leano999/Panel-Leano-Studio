@@ -457,6 +457,61 @@
   });
 
   // ---- Custom actions ----
+  // Common TikTok gift names + approximate coin price (2026), so users can
+  // pick from a dropdown instead of typing the exact gift name themselves
+  // (like Indofinity/Tikfinity does).
+  //
+  // IMPORTANT: "name" below must be the gift name TikTok's API actually
+  // sends (see tiktok.js: gift.name), which is normally the English/
+  // canonical name (e.g. "Rose", "Perfume") even when the TikTok app shows
+  // an Indonesian label to the viewer (e.g. "Mawar"). That's the value
+  // used for matching, so it has to match exactly what arrives. "label" is
+  // just the human-friendly text shown in the dropdown, Indonesian name
+  // included so it's easy to recognize.
+  // TikTok has no public "list all gifts" API and prices/availability can
+  // change or vary by region, so this is a curated list from public 2026
+  // gift-price roundups, not a live/official feed. Use "Lainnya" to type
+  // any gift name manually if it's not listed here, the price has since
+  // changed, or the exact name TikTok sends doesn't match what's shown.
+  const KNOWN_GIFTS = [
+    { name: 'Rose', label: 'Rose (Mawar)', coins: 1 },
+    { name: 'TikTok', label: 'TikTok', coins: 1 },
+    { name: 'GG', label: 'GG', coins: 1 },
+    { name: 'Love Letter', label: 'Love Letter', coins: 1 },
+    { name: 'Football', label: 'Football (Sepak Bola)', coins: 1 },
+    { name: 'Mini Speaker', label: 'Mini Speaker (Speaker Mini)', coins: 1 },
+    { name: 'Ice Cream Cone', label: 'Ice Cream Cone (Kerucut Es Krim)', coins: 1 },
+    { name: 'Hi', label: 'Hi', coins: 5 },
+    { name: 'Finger Heart', label: 'Finger Heart (Jari Hati)', coins: 5 },
+    { name: 'Mic', label: 'Mic', coins: 5 },
+    { name: 'Panda', label: 'Panda', coins: 5 },
+    { name: 'Perfume', label: 'Perfume (Parfum)', coins: 20 },
+    { name: 'Doughnut', label: 'Doughnut (Donat)', coins: 30 },
+    { name: 'Mirror', label: 'Mirror (Cermin)', coins: 30 },
+    { name: 'Little Crown', label: 'Little Crown (Mahkota)', coins: 99 },
+    { name: 'Heart Me', label: 'Heart Me (Hati)', coins: 100 },
+    { name: 'Confetti', label: 'Confetti (Konfeti)', coins: 100 },
+    { name: 'Kiss', label: 'Kiss (Ciuman)', coins: 150 },
+    { name: 'Butterfly', label: 'Butterfly (Kupu-kupu)', coins: 169 },
+    { name: 'Sunglasses', label: 'Sunglasses (Kacamata)', coins: 199 },
+    { name: 'Rock n Roll', label: 'Rock n Roll', coins: 299 },
+    { name: 'Bonfire', label: 'Bonfire (Api Unggun)', coins: 388 },
+    { name: 'Corgi', label: 'Corgi', coins: 299 },
+    { name: 'Money Gun', label: 'Money Gun', coins: 1000 },
+    { name: 'Coral', label: 'Coral', coins: 1000 },
+    { name: 'Pool Party', label: 'Pool Party (Pesta Kolam)', coins: 4999 },
+    { name: 'Submarine', label: 'Submarine (Kapal Selam)', coins: 5199 },
+    { name: 'Concert', label: 'Concert (Pesawat/Konser)', coins: 6000 },
+    { name: 'Sports Car', label: 'Sports Car (Mobil Balap)', coins: 7000 },
+    { name: 'Yacht', label: 'Yacht', coins: 9888 },
+    { name: 'Falcon', label: 'Falcon (Elang)', coins: 10999 },
+    { name: 'Planet', label: 'Planet', coins: 15000 },
+    { name: 'Interstellar', label: 'Interstellar (Antarbintang)', coins: 15000 },
+    { name: 'Rocket', label: 'Rocket (Roket)', coins: 20000 },
+    { name: 'Fantasy Castle', label: 'Fantasy Castle (Kastil Fantasi)', coins: 20000 },
+    { name: 'Lion', label: 'Lion (Singa)', coins: 29999 },
+    { name: 'Universe', label: 'TikTok Universe', coins: 44999 },
+  ];
   let actionRules = [];
   function addAction(){
     actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!', key:'', holdMs:0 });
@@ -474,6 +529,7 @@
       wrap.className = 'field';
       wrap.style.marginTop = '12px';
       const isKeypress = a.action === 'keypress';
+      const isGiftEvent = a.event === 'gift';
       // For "keypress" we swap the generic free-text value field for a
       // key-name input + a hold-duration (ms) input, since a keypress rule
       // needs both pieces of info instead of one text value.
@@ -481,6 +537,22 @@
         ? `<input data-i="${i}" data-k="key" value="${escapeHtml(a.key||'')}" placeholder="tombol, contoh: Y" style="flex:1;min-width:90px;text-transform:uppercase;">
            <input data-i="${i}" data-k="holdMs" type="number" min="0" max="10000" step="50" value="${Number(a.holdMs)||0}" placeholder="tahan (ms)" style="flex:1;min-width:110px;">`
         : `<input data-i="${i}" data-k="value" value="${escapeHtml(a.value)}" placeholder="aksi / teks / sound id" style="flex:2;min-width:200px;">`;
+
+      // For "gift" events, offer a dropdown of common TikTok gift names +
+      // approximate coin price (like Indofinity), with a "Lainnya" fallback
+      // that reveals a manual text input for anything not listed or if the
+      // price has since changed.
+      const matchesKnownGift = KNOWN_GIFTS.some(g => g.name.toLowerCase() === String(a.keyword||'').toLowerCase());
+      const isCustomGift = isGiftEvent && a.keyword && !matchesKnownGift;
+      const keywordHtml = isGiftEvent
+        ? `<select data-i="${i}" data-k="keywordSelect" style="flex:1;min-width:220px;">
+             <option value="" ${!a.keyword?'selected':''}>-- Semua gift --</option>
+             ${KNOWN_GIFTS.map(g => `<option value="${escapeHtml(g.name)}" ${g.name.toLowerCase()===String(a.keyword||'').toLowerCase()?'selected':''}>${escapeHtml(g.label)} — ${g.coins.toLocaleString('id-ID')} koin</option>`).join('')}
+             <option value="__custom__" ${isCustomGift?'selected':''}>Lainnya (ketik manual)...</option>
+           </select>
+           ${isCustomGift ? `<input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="nama gift manual" style="flex:1;min-width:150px;">` : ''}`
+        : `<input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="keyword (kosong = semua)" style="flex:1;min-width:150px;">`;
+
       wrap.innerHTML = `
         <div class="row" style="gap:8px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" data-i="${i}" data-k="enabled" ${a.enabled?'checked':''}> ON</label>
@@ -490,7 +562,7 @@
             <option value="follow" ${a.event==='follow'?'selected':''}>Follow</option>
             <option value="gift" ${a.event==='gift'?'selected':''}>Gift</option>
           </select>
-          <input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="keyword (kosong = semua), contoh: heart me" style="flex:1;min-width:150px;">
+          ${keywordHtml}
           <select data-i="${i}" data-k="action" style="width:120px;">
             <option value="tts" ${a.action==='tts'?'selected':''}>TTS</option>
             <option value="alert" ${a.action==='alert'?'selected':''}>Alert</option>
@@ -505,8 +577,15 @@
     });
     root.querySelectorAll('[data-i][data-k]').forEach(el => el.addEventListener('input', () => {
       const i = Number(el.dataset.i), k = el.dataset.k;
+      if (k === 'keywordSelect') {
+        // Selecting a known gift sets the real "keyword" field directly;
+        // picking "Lainnya" clears it so the manual text input appears empty.
+        actionRules[i].keyword = el.value === '__custom__' ? '' : el.value;
+        renderActions();
+        return;
+      }
       actionRules[i][k] = el.type === 'checkbox' ? el.checked : (el.type === 'number' ? Number(el.value) || 0 : el.value);
-      if (k === 'action') renderActions(); // switch value field <-> key/hold fields
+      if (k === 'action' || k === 'event') renderActions(); // swap dependent fields
     }));
     root.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
       actionRules.splice(Number(el.dataset.remove), 1); renderActions();
