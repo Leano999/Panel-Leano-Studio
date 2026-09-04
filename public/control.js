@@ -18,10 +18,24 @@
 
   // ---- TTS voice list ----
   let availableVoices = [];
+  // FIX PERFORMANCE: dulu loadVoiceOptions() selalu bongkar-pasang ulang
+  // SEMUA <option> di dropdown voice dari nol, setiap kali dipanggil.
+  // Fungsi ini dipanggil dari setInterval tiap 1.5 detik SECARA GLOBAL
+  // (bukan cuma pas tab Text-to-Speech kebuka), jadi main thread browser
+  // sering "keblok" sebentar tiap 1.5 detik terus-menerus — ini yang bikin
+  // klik/pindah tab kerasa delay di SEMUA tab, bukan cuma TTS.
+  // Sekarang kita simpan signature (jumlah + nama voice) dari render
+  // terakhir, dan cuma bongkar-pasang ulang dropdown kalau daftar
+  // voice-nya BENERAN berubah. Browser jarang sekali ganti daftar voice
+  // di tengah sesi, jadi harusnya cuma render ulang 1-2 kali pas load awal.
+  let lastVoiceSignature = '';
   function loadVoiceOptions(){
     availableVoices = speechSynthesis.getVoices() || [];
     const select = document.getElementById('ttsVoice');
     if(!select) return;
+    const signature = availableVoices.map(v => v.name + '|' + v.lang).join(',');
+    if(signature === lastVoiceSignature) return; // gak ada perubahan, skip rebuild DOM
+    lastVoiceSignature = signature;
     const current = select.value;
     select.innerHTML = '<option value="">Otomatis — Bahasa Indonesia</option>';
 
