@@ -2,6 +2,8 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
+const crypto = require("crypto");
 const { Server } = require("socket.io");
 const https = require("https");
 const { setupTiktok } = require("./tiktok");
@@ -13,71 +15,95 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, "public")));
 
-// Neural TTS via Microsoft Azure Speech. Keep the key server-side; never put it in browser JS.
-const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY || "";
-const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "";
-const AZURE_TTS_VOICE = "id-ID-GadisNeural";
-
-function xmlEscape(value) {
-  return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+// Natural TTS via Microsoft Edge online TTS (no Azure API key required).
+// The voice is intentionally fixed to Indonesian female neural speech.
+const EDGE_TTS_VOICE = "id-ID-GadisNeural";
+const TTS_CACHE_DIR = path.join(os.tmpdir(), "leano-stream-panel-tts");
+fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
+let EdgeTTS = null;
+try {
+  ({ EdgeTTS } = require("node-edge-tts"));
+} catch (_) {
+  // Dependency is installed automatically by START PANEL.bat / npm install.
 }
+
 function pctRate(rate) {
   const n = Number(rate);
-  const r = Number.isFinite(n) ? Math.max(0.5, Math.min(1.5, n)) : 0.95;
+  const r = Number.isFinite(n) ? Math.max(0.65, Math.min(1.35, n)) : 0.95;
   const pct = Math.round((r - 1) * 100);
   return (pct >= 0 ? "+" : "") + pct + "%";
 }
-function stPitch(pitch) {
+function edgePitch(pitch) {
   const n = Number(pitch);
   const p = Number.isFinite(n) ? Math.max(0.5, Math.min(1.5, n)) : 1;
-  const st = Math.round((p - 1) * 4 * 10) / 10;
-  return (st >= 0 ? "+" : "") + st + "st";
+  const hz = Math.round((p - 1) * 50);
+  return (hz >= 0 ? "+" : "") + hz + "Hz";
+}
+function edgeVolume(volume) {
+  const n = Number(volume);
+  const v = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
+  const pct = Math.round((v - 1) * 100);
+  return (pct >= 0 ? "+" : "") + pct + "%";
+}
+function cleanTtsText(value) {
+  return String(value || "")
+    .replace(/https?:\/\/\S+/gi, " link ")
+    .replace(/www\.\S+/gi, " link ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+function ttsCacheFile(text, rate, pitch, volume) {
+  const key = crypto.createHash("sha256")
+    .update(JSON.stringify([EDGE_TTS_VOICE, text, rate, pitch, volume]))
+    .digest("hex");
+  return path.join(TTS_CACHE_DIR, key + ".mp3");
 }
 
-app.post("/api/tts", express.text({ type: ["text/plain", "application/json"] }), (req, res) => {
-  if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
-    return res.status(503).json({ ok:false, error:"Azure Speech belum dikonfigurasi. Set AZURE_SPEECH_KEY dan AZURE_SPEECH_REGION." });
-  }
+app.post("/api/tts", express.text({ type: ["text/plain", "application/json"] }), async (req, res) => {
   let body = req.body;
   if (typeof body === "string") {
     try { body = JSON.parse(body); } catch (_) { body = { text: body }; }
   }
   body = body || {};
-  const text = String(body.text || "").replace(/https?:\/\/\S+/gi, " link ").replace(/\s+/g, " ").trim().slice(0, 500);
-  if (!text) return res.status(400).json({ok:false,error:"Teks kosong."});
+  const text = cleanTtsText(body.text);
+  if (!text) return res.status(400).json({ ok:false, error:"Teks kosong." });
+  if (!EdgeTTS) {
+    return res.status(503).json({
+      ok:false,
+      error:"Modul TTS natural belum terpasang. Tutup panel lalu jalankan START PANEL.bat lagi, atau jalankan: npm install"
+    });
+  }
 
   const rate = Number(body.rate) || 0.95;
   const pitch = Number(body.pitch) || 1;
-  const volume = Math.max(1, Math.min(100, Math.round((Number(body.volume) || 1) * 100)));
-  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="id-ID"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${pctRate(rate)}" pitch="${stPitch(pitch)}" volume="${volume}">${xmlEscape(text)}</prosody></voice></speak>`;
-  const data = Buffer.from(ssml, "utf8");
-  const options = {
-    hostname: `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`,
-    path: "/cognitiveservices/v1",
-    method: "POST",
-    headers: {
-      "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
-      "Content-Type": "application/ssml+xml",
-      "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3",
-      "User-Agent": "LeanoStreamPanel-NeuralTTS/1.0",
-      "Content-Length": data.length,
-    },
-  };
-  const request = https.request(options, r => {
-    const chunks=[];
-    r.on("data", c => chunks.push(c));
-    r.on("end", () => {
-      const audio=Buffer.concat(chunks);
-      if (r.statusCode !== 200) {
-        let msg=audio.toString("utf8").slice(0,500);
-        return res.status(502).json({ok:false,error:`Azure Speech HTTP ${r.statusCode}: ${msg}`});
-      }
-      res.status(200).set("Content-Type","audio/mpeg").set("Cache-Control","no-store").send(audio);
-    });
-  });
-  request.on("error", err => res.status(502).json({ok:false,error:`Azure Speech gagal: ${err.message}`}));
-  request.write(data); request.end();
+  const volume = Number.isFinite(Number(body.volume)) ? Number(body.volume) : 1;
+  const outFile = ttsCacheFile(text, rate, pitch, volume);
+
+  try {
+    if (!fs.existsSync(outFile) || fs.statSync(outFile).size < 1000) {
+      const tts = new EdgeTTS({
+        voice: EDGE_TTS_VOICE,
+        lang: "id-ID",
+        outputFormat: "audio-24khz-96kbitrate-mono-mp3",
+        rate: pctRate(rate),
+        pitch: edgePitch(pitch),
+        volume: edgeVolume(volume),
+        timeout: 15000,
+      });
+      await tts.ttsPromise(text, outFile);
+    }
+    res.status(200)
+      .set("Content-Type", "audio/mpeg")
+      .set("Cache-Control", "no-store")
+      .sendFile(outFile);
+  } catch (err) {
+    try { if (fs.existsSync(outFile)) fs.unlinkSync(outFile); } catch (_) {}
+    console.error("[TTS]", err);
+    res.status(502).json({ ok:false, error:`TTS natural gagal: ${err.message || err}` });
+  }
 });
+
 registerRobloxRoutes(app);
 
 const tiktok = setupTiktok(io, processEvent);
@@ -93,7 +119,7 @@ let ttsSettings = {
   readFollows: false,
   readGifts: false,
   voiceName: "id-ID-GadisNeural",
-  voicePreset: "neural",
+  voicePreset: "indofinity-natural",
   rate: 0.95,
   pitch: 1,
   volume: 1,
@@ -525,9 +551,9 @@ io.on("connection", (socket) => {
       readFollows: payload.readFollows === true,
       readGifts: payload.readGifts === true,
       voiceName: "id-ID-GadisNeural",
-      voicePreset: "neural",
-      rate: Math.min(2, Math.max(0.5, Number(payload.rate) || 1)),
-      pitch: Math.min(2, Math.max(0, Number(payload.pitch) || 1)),
+      voicePreset: "indofinity-natural",
+      rate: Math.min(1.5, Math.max(0.5, Number(payload.rate) || 0.95)),
+      pitch: Math.min(1.5, Math.max(0.5, Number(payload.pitch) || 1)),
       volume: Math.min(1, Math.max(0, Number(payload.volume) || 1)),
     };
     io.emit("tts:settings", ttsSettings);

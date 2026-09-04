@@ -186,7 +186,7 @@
       readFollows: document.getElementById('ttsReadFollows').checked,
       readGifts: document.getElementById('ttsReadGifts').checked,
       voiceName: FIXED_TTS_VOICE,
-      voicePreset: 'neural',
+      voicePreset: 'indofinity-natural',
       rate: Number(document.getElementById('ttsRate').value) || 0.95,
       pitch: Number(document.getElementById('ttsPitch').value) || 1,
       volume: Number(document.getElementById('ttsVolume').value) / 100,
@@ -199,7 +199,7 @@
     document.getElementById('ttsPitchValue').textContent = settings.pitch.toFixed(2);
     document.getElementById('ttsVolumeValue').textContent = Math.round(settings.volume * 100) + '%';
     socket.emit('tts:settings', settings);
-    logEvent(`TTS Neural: komentar ${settings.readComments ? 'ON' : 'OFF'}, like ${settings.readLikes ? 'ON' : 'OFF'}, follow ${settings.readFollows ? 'ON' : 'OFF'}, gift ${settings.readGifts ? 'ON' : 'OFF'}`);
+    logEvent(`TTS Natural: komentar ${settings.readComments ? 'ON' : 'OFF'}, like ${settings.readLikes ? 'ON' : 'OFF'}, follow ${settings.readFollows ? 'ON' : 'OFF'}, gift ${settings.readGifts ? 'ON' : 'OFF'}`);
   }
 
   socket.on('tts:settings', (settings) => {
@@ -253,14 +253,14 @@
   async function unlockTts(){
     unlockSfxAudio();
     ttsUnlocked=true;
-    document.getElementById('voiceStatus').textContent='Engine: Microsoft Azure Neural · Voice: id-ID-GadisNeural · AKTIF';
+    document.getElementById('voiceStatus').textContent='Engine: Microsoft Edge Neural · Voice tetap: id-ID-GadisNeural · AKTIF';
     document.getElementById('ttsDiagnostic').textContent='Menyiapkan suara neural…';
     try{
       await playNeuralTts('TTS neural aktif.');
-      document.getElementById('ttsDiagnostic').textContent='TTS Neural AKTIF. Komentar akan dibaca dengan suara natural.';
+      document.getElementById('ttsDiagnostic').textContent='TTS Natural AKTIF. Komentar akan dibaca dengan suara natural.';
       pumpLiveTts();
     }catch(e){
-      document.getElementById('ttsDiagnostic').textContent='TTS Neural belum aktif: '+(e.message||e)+' Pastikan AZURE_SPEECH_KEY dan AZURE_SPEECH_REGION sudah diatur di server.';
+      document.getElementById('ttsDiagnostic').textContent='TTS Natural belum aktif: '+(e.message||e);
     }
   }
 
@@ -316,14 +316,14 @@
     const text = document.getElementById('ttsText').value.trim();
     if(!text) return;
     socket.emit('trigger', { kind:'tts', text });
-    logEvent(`TTS Neural manual dikirim: "${text}"`);
+    logEvent(`TTS Natural manual dikirim: "${text}"`);
   }
 
   async function previewTts(){
     const text = document.getElementById('ttsText').value.trim();
     if(!text) return;
     ttsUnlocked=true;
-    try{ await playNeuralTts(text); logEvent('Preview TTS Neural diputar di browser panel.'); }
+    try{ await playNeuralTts(text); logEvent('Preview TTS Natural diputar di browser panel.'); }
     catch(e){ document.getElementById('ttsDiagnostic').textContent='Preview TTS gagal: '+(e.message||e); }
   }
 
