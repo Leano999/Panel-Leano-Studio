@@ -274,6 +274,59 @@ async function searchYouTubeMulti(query, limit = 10) {
   return results;
 }
 
+// Khusus buat fallback kalau video pertama gagal diputar (kena restriksi
+// embed / region-lock / dll) -- BEDA dari searchYouTubeMulti yang sengaja
+// menyaring versi mirip untuk shuffle genre. Di sini kita justru MAU
+// beberapa upload lain dari lagu yang sama (official/lyric/cover dari
+// channel berbeda) sebagai cadangan, biar kalau upload pertama dikunci
+// embed-nya, player bisa otomatis coba upload lain tanpa nge-skip lagu.
+async function searchYouTubeCandidates(query, limit = 5) {
+  const https = require("https");
+  const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+  const html = await new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }, res => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", c => data += c);
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.setTimeout(12000, () => { req.destroy(new Error("YouTube search timeout")); });
+  });
+  const marker = "var ytInitialData = ";
+  const start = html.indexOf(marker);
+  if (start < 0) throw new Error("YouTube search tidak tersedia.");
+  const jsonStart = start + marker.length;
+  const end = html.indexOf(";</script>", jsonStart);
+  if (end < 0) throw new Error("Hasil YouTube tidak bisa dibaca.");
+  const data = JSON.parse(html.slice(jsonStart, end));
+  const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+  const results = [];
+  const seen = new Set();
+  for (const section of contents) {
+    const items = section?.itemSectionRenderer?.contents || [];
+    for (const item of items) {
+      const v = item?.videoRenderer;
+      if (!v?.videoId || !v?.title?.runs?.[0]?.text) continue;
+      if (seen.has(v.videoId)) continue;
+      seen.add(v.videoId);
+      const title = v.title.runs.map(x => x.text).join("");
+      const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
+      const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
+      const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+      results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
+      if (results.length >= limit) return results;
+    }
+  }
+  if (!results.length) throw new Error("Video YouTube tidak ditemukan.");
+  return results;
+}
+
 async function addMusicRequest(username, query) {
   const clean = String(query || "").trim().slice(0, 160);
   if (!clean) return { ok:false, message:"Judul lagu kosong." };
@@ -287,8 +340,12 @@ async function addMusicRequest(username, query) {
   if (musicSearchBusy) return { ok:false, message:"Bot sedang mencari request lain, coba lagi sebentar." };
   musicSearchBusy = true;
   try {
-    const found = await searchYouTube(clean);
-    const item = { ...found, requestedBy: String(username || "Penonton"), query: clean, id: `${found.videoId}-${Date.now()}` };
+    const candidates = await searchYouTubeCandidates(clean, 5);
+    const [found, ...altCandidates] = candidates;
+    // altCandidates disertakan ke client: kalau video utama gagal diputar
+    // (mis. embed dikunci pemiliknya), player otomatis coba upload lain
+    // dari lagu yang sama, bukan langsung nge-skip request ini.
+    const item = { ...found, altCandidates, requestedBy: String(username || "Penonton"), query: clean, id: `${found.videoId}-${Date.now()}` };
     musicRequestCooldown.set(key, now + MUSIC_COOLDOWN_MS);
     // Request beneran dari penonton diprioritaskan di atas Auto DJ —
     // kalau yang lagi main sekarang cuma lagu isian dari fallback

@@ -588,7 +588,8 @@
   let chromeMusicPlayer = null;
   let chromeMusicApiReady = false;
   let chromeMusicActivated = false;
-  let chromeMusicCurrentId = null;
+  let chromeMusicCurrentId = null; // id "resmi" request ini (dipakai buat sinkron ke server)
+  let chromeMusicAltQueue = []; // sisa video kandidat lain buat request yang sama, kalau yang lagi jalan gagal
   let chromeMusicPending = null;
   let chromeMusicVolume = 0.75;
 
@@ -621,11 +622,27 @@
           onStateChange:function(e){
             if(e.data===YT.PlayerState.PLAYING){ try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} setChromeMusicStatus('🔊 Musik sedang bunyi dari Chrome · target 144p',true); }
             if(e.data===YT.PlayerState.ENDED && chromeMusicCurrentId){
-              const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id});
+              const id=chromeMusicCurrentId; chromeMusicCurrentId=null; chromeMusicAltQueue=[]; socket.emit('music:ended',{videoId:id});
             }
           },
           onError:function(){
-            setChromeMusicStatus('❌ YouTube gagal memainkan video ini');
+            // Video ini biasanya gagal bukan karena bug panel, tapi karena
+            // pemiliknya sendiri mengunci embed (umum buat video musik
+            // official/label besar), region-lock, atau video dihapus/private.
+            // Daripada langsung nge-skip seluruh request, coba dulu upload
+            // lain dari lagu yang sama (dikirim server sebagai altCandidates).
+            if(chromeMusicAltQueue.length){
+              const nextId = chromeMusicAltQueue.shift();
+              setChromeMusicStatus('⚠️ Video ini dibatasi pemiliknya (gak bisa ditanam di web lain), coba versi lain…');
+              try{
+                chromeMusicPlayer.setVolume(Math.round(chromeMusicVolume*100));
+                chromeMusicPlayer.loadVideoById({videoId:nextId,startSeconds:0,suggestedQuality:'tiny'});
+                setTimeout(()=>{ try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} }, 1200);
+                chromeMusicPlayer.playVideo();
+              }catch(e){}
+              return;
+            }
+            setChromeMusicStatus('❌ Semua versi video ini gagal diputar (kemungkinan dibatasi/dihapus)');
             if(chromeMusicCurrentId){ const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id}); }
           }
         }
@@ -666,6 +683,9 @@
     if(!chromeMusicApiReady || !chromeMusicPlayer){ loadChromeYouTubeApi(); return; }
     if(chromeMusicCurrentId===item.videoId) return;
     chromeMusicCurrentId=item.videoId;
+    // Simpan video cadangan (upload lain dari lagu yang sama) buat dicoba
+    // otomatis kalau video utama ini gagal diputar (lihat onError di atas).
+    chromeMusicAltQueue = Array.isArray(item.altCandidates) ? item.altCandidates.map(c => c.videoId).filter(Boolean) : [];
     setChromeMusicStatus('⏳ Memutar: '+(item.title||'Lagu'));
     // Cuma satu pemutar aktif dalam satu waktu -- hentikan YouTube Player (auto) kalau lagi jalan.
     if(ytAutoPlayer && ytAutoApiReady){ try{ ytAutoPlayer.pauseVideo(); }catch(e){} }
