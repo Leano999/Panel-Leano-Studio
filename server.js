@@ -4,105 +4,16 @@ const path = require("path");
 const os = require("os");
 const { Server } = require("socket.io");
 const { setupTiktok } = require("./tiktok");
+const { maybeQueueEffectForGift, registerRobloxRoutes } = require("./roblox-bridge");
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, "public")));
+registerRobloxRoutes(app);
 
 const tiktok = setupTiktok(io, processEvent);
-
-// ---- Keypress-on-gift (v45) ----
-// Simulates a real keyboard press on THIS machine whenever a matching
-// gift/comment/like/follow event fires. This only makes sense when the
-// panel runs locally (START PANEL.bat) on the same PC as OBS/the game -
-// a cloud host like Railway has no keyboard/desktop session to press keys
-// into, so this feature silently no-ops there.
-let nutKeyboard = null;
-let NutKey = null;
-try {
-  const nut = require("@nut-tree-fork/nut-js");
-  nutKeyboard = nut.keyboard;
-  NutKey = nut.Key;
-  nutKeyboard.config.autoDelayMs = 0;
-  console.log("[keypress] Simulasi keyboard aktif (nut-js siap).");
-} catch (err) {
-  console.warn(
-    "[keypress] @nut-tree-fork/nut-js tidak ditemukan/tidak bisa dimuat - fitur " +
-    "'Keypress' di Custom Action Events tidak akan menekan tombol apa pun. " +
-    "Jalankan npm install lagi lalu restart panel untuk mengaktifkannya. " +
-    "(Fitur ini memang hanya berfungsi saat panel dijalankan lokal, bukan di Railway.)"
-  );
-}
-
-// Map dari nama tombol yang diketik user (bebas huruf besar/kecil) ke Key nut-js.
-const KEY_NAME_MAP = (() => {
-  if (!NutKey) return {};
-  const map = {};
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((ch) => { map[ch] = NutKey[ch]; });
-  "0123456789".split("").forEach((d) => { map[d] = NutKey[`Num${d}`]; });
-  for (let i = 1; i <= 12; i++) map[`F${i}`] = NutKey[`F${i}`];
-  Object.assign(map, {
-    SPACE: NutKey.Space,
-    SPACEBAR: NutKey.Space,
-    ENTER: NutKey.Enter,
-    RETURN: NutKey.Enter,
-    TAB: NutKey.Tab,
-    ESC: NutKey.Escape,
-    ESCAPE: NutKey.Escape,
-    UP: NutKey.Up,
-    DOWN: NutKey.Down,
-    LEFT: NutKey.Left,
-    RIGHT: NutKey.Right,
-    SHIFT: NutKey.LeftShift,
-    CTRL: NutKey.LeftControl,
-    CONTROL: NutKey.LeftControl,
-    ALT: NutKey.LeftAlt,
-  });
-  return map;
-})();
-
-function resolveKey(name) {
-  const key = String(name || "").trim().toUpperCase();
-  return Object.prototype.hasOwnProperty.call(KEY_NAME_MAP, key) ? KEY_NAME_MAP[key] : null;
-}
-
-// Tracks currently-held keys so an in-flight "hold" can be released early
-// if the same key is triggered again (avoids a stuck key on rapid gifts).
-const heldKeyTimers = new Map();
-
-async function simulateKeypress(keyName, holdMs = 0) {
-  if (!nutKeyboard) return; // library not available (e.g. running on Railway)
-  const key = resolveKey(keyName);
-  if (key === null) {
-    console.warn(`[keypress] Tombol "${keyName}" tidak dikenali, dilewati.`);
-    return;
-  }
-  const duration = Math.min(10000, Math.max(0, Number(holdMs) || 0));
-
-  // If this exact key is already being held from a previous trigger, clear
-  // that timer first so we don't release it too early/late.
-  if (heldKeyTimers.has(key)) {
-    clearTimeout(heldKeyTimers.get(key));
-    heldKeyTimers.delete(key);
-  }
-
-  try {
-    await nutKeyboard.pressKey(key);
-    if (duration <= 0) {
-      await nutKeyboard.releaseKey(key);
-    } else {
-      const timer = setTimeout(async () => {
-        heldKeyTimers.delete(key);
-        try { await nutKeyboard.releaseKey(key); } catch (err) { /* ignore */ }
-      }, duration);
-      heldKeyTimers.set(key, timer);
-    }
-  } catch (err) {
-    console.warn(`[keypress] Gagal menekan tombol "${keyName}":`, err.message);
-  }
-}
 
 // TTS auto-read settings, in-memory (resets on server restart).
 // readComments/readLikes control whether the overlay speaks incoming
@@ -275,25 +186,6 @@ function scheduleLiveStateBroadcast() {
   }, 250);
 }
 
-// Auto-learned gift catalog: instead of guessing gift names/coin prices
-// (TikTok has no public "list all gifts" API and prices change), we just
-// remember every real gift name + coin cost that actually arrives from
-// TikTok during a live session. This is guaranteed accurate because it's
-// the exact data TikTok itself sent - no guesswork. Resets on server
-// restart, same as the other in-memory settings in this file.
-let discoveredGifts = new Map(); // giftName (lowercase) -> { name, coins }
-
-function rememberGift(giftName, coinsPerUnit) {
-  const name = String(giftName || "").trim();
-  if (!name) return;
-  const key = name.toLowerCase();
-  const coins = Math.max(0, Number(coinsPerUnit) || 0);
-  const existing = discoveredGifts.get(key);
-  if (existing && existing.coins === coins) return; // no change, skip broadcast
-  discoveredGifts.set(key, { name, coins });
-  io.emit("gifts:known", [...discoveredGifts.values()]);
-}
-
 let customActions = [
   {
     id: "follow-sfx",
@@ -322,7 +214,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("actions:get", () => socket.emit("actions:list", customActions));
-  socket.emit("gifts:known", [...discoveredGifts.values()]);
   socket.on("actions:save", (actions = []) => {
     customActions = Array.isArray(actions) ? actions.slice(0, 50).map(normalizeAction) : [];
     io.emit("actions:list", customActions);
@@ -455,12 +346,8 @@ function normalizeAction(a = {}) {
     enabled: a.enabled !== false,
     event: ["comment", "like", "follow", "gift"].includes(a.event) ? a.event : "comment",
     keyword: String(a.keyword || "").slice(0, 80),
-    action: ["tts", "alert", "sound", "keypress"].includes(a.action) ? a.action : "tts",
+    action: ["tts", "alert", "sound"].includes(a.action) ? a.action : "tts",
     value: String(a.value || "").slice(0, 200),
-    // Only used when action === "keypress":
-    key: String(a.key || "").slice(0, 20),
-    // How long to hold the key down, in milliseconds. 0 = quick tap.
-    holdMs: Math.min(10000, Math.max(0, Number(a.holdMs) || 0)),
   };
 }
 
@@ -494,8 +381,6 @@ function runCustomActions(payload) {
       });
     } else if (action.action === "sound") {
       io.emit("event", { kind: "sound", id: action.value || "ding" });
-    } else if (action.action === "keypress") {
-      simulateKeypress(action.key, action.holdMs);
     }
   }
 }
@@ -566,14 +451,7 @@ function processEvent(payload = {}, meta = {}) {
     if (payload.type === "follow") streamStats.follows += 1;
     if (payload.type === "gift") {
       streamStats.gifts += 1;
-      // Remember this gift's real name + coin cost per unit (payload.coins
-      // is already multiplied by count, so divide back down) so the
-      // Custom Events gift dropdown can offer it going forward.
-      if (payload.giftName) {
-        const count = Math.max(1, Number(payload.count) || 1);
-        const perUnitCoins = Number(payload.coins || 0) / count;
-        rememberGift(payload.giftName, perUnitCoins);
-      }
+      maybeQueueEffectForGift(payload);
     }
 
     // Keep the current goal synchronized with the selected event.

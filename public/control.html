@@ -9,6 +9,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="control.css">
+<link rel="stylesheet" href="lite-mode.css">
+<script>
+  // Aktifkan lagi Mode Ringan otomatis kalau sebelumnya pernah
+  // dinyalain, sebelum halaman sempat ke-render (biar gak "kedip").
+  (function () {
+    try {
+      if (localStorage.getItem("panelLeanoLiteMode") === "1") {
+        document.documentElement.classList.add("lite-mode");
+      }
+    } catch (e) {}
+  })();
+</script>
 </head>
 <body>
 <div class="app-shell">
@@ -46,6 +58,7 @@
       <div class="topbar-right">
         <span class="top-chip">⌁ LOCAL PANEL</span>
         <span class="top-status"><i id="topConnDot"></i><span id="topConnStatus">BELUM TERHUBUNG</span></span>
+        <button class="v38-icon-btn" type="button" id="liteModeToggle" aria-label="Mode Ringan" title="Mode Ringan: nonaktif (klik untuk aktifkan, mematikan efek blur/glow biar panel lebih ringan)">⚡</button>
         <button class="v38-icon-btn" type="button" aria-label="Notifikasi" title="Notifikasi">♧</button>
         <button class="v38-icon-btn" type="button" aria-label="Pengaturan" title="Pengaturan">⚙</button>
         <div class="top-avatar">L</div>
@@ -536,6 +549,33 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="control.js" defer></script>
+<script>
+  // Tombol Mode Ringan (⚡) di topbar: nyala/mati efek blur & glow
+  // yang berat di rendering, terutama di Linux tanpa GPU acceleration.
+  (function () {
+    var btn = document.getElementById("liteModeToggle");
+    if (!btn) return;
+
+    function sync() {
+      var on = document.documentElement.classList.contains("lite-mode");
+      btn.style.color = on ? "#39d98a" : "";
+      btn.title = on
+        ? "Mode Ringan: AKTIF (klik untuk kembali ke tampilan normal)"
+        : "Mode Ringan: nonaktif (klik untuk aktifkan, mematikan efek blur/glow biar panel lebih ringan)";
+    }
+
+    btn.addEventListener("click", function () {
+      document.documentElement.classList.toggle("lite-mode");
+      var on = document.documentElement.classList.contains("lite-mode");
+      try {
+        localStorage.setItem("panelLeanoLiteMode", on ? "1" : "0");
+      } catch (e) {}
+      sync();
+    });
+
+    sync();
+  })();
+</script>
 
     </div>
   </main>
