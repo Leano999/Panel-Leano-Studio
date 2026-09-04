@@ -1,22 +1,3 @@
-// === BROWSER TTS (NO SERVER, NO AZURE) ===
-function speakTextBrowser(text){
-  const utter = new SpeechSynthesisUtterance(text);
-
-  utter.lang = "id-ID";
-  utter.rate = 1.05;
-  utter.pitch = 1.05;
-  utter.volume = 1;
-
-  const voices = speechSynthesis.getVoices();
-  const indo = voices.find(v => v.lang && v.lang.includes("id"));
-
-  if (indo) utter.voice = indo;
-
-  speechSynthesis.speak(utter);
-}
-
-speechSynthesis.onvoiceschanged = () => {};
-
   const socket = io();
   const statusEl = document.getElementById('connStatus');
   const topStatusEl = document.getElementById('topConnStatus');
@@ -289,10 +270,7 @@ speechSynthesis.onvoiceschanged = () => {};
     catch(e){ document.getElementById('ttsDiagnostic').textContent='Tes TTS gagal: '+(e.message||e); }
   }
 
- function queueLiveTts(text){
-  if(!text) return;
-  speakTextBrowser(text);
-}
+  function queueLiveTts(text){
     if(!text || !ttsUnlocked) return;
     liveTtsQueue.push(String(text).replace(/https?:\/\/\S+/gi,' link ').replace(/\s+/g,' ').trim().slice(0,500));
     if(liveTtsQueue.length>20) liveTtsQueue.shift();
