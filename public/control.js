@@ -721,8 +721,25 @@
           return;
         }
       } else {
-        ytAutoPlayer.loadPlaylist({listType:'search', list: raw});
-        setYtAutoStatus('▶ Memutar hasil pencarian: '+raw);
+        // CATATAN: fitur bawaan IFrame API `listType:'search'` sudah lama
+        // dimatikan YouTube (selalu balikin "An error occurred. Please try
+        // again later."). Jadi kita cari videonya sendiri lewat server
+        // (endpoint yang sama dipakai Music Request), lalu masukkan hasilnya
+        // sebagai daftar video ID asli ke player -- ini tetap didukung YouTube.
+        setYtAutoStatus('⏳ Mencari: '+raw);
+        socket.emit('ytauto:search', raw, function(res){
+          if(!res || !res.ok || !res.results || !res.results.length){
+            setYtAutoStatus('❌ '+((res && res.message) || 'Tidak ada hasil untuk kata kunci itu.'));
+            return;
+          }
+          const ids = res.results.map(r => r.videoId);
+          try{
+            ytAutoPlayer.loadPlaylist({playlist: ids, index: 0});
+            const loopEl = document.getElementById('ytAutoLoop');
+            if(loopEl){ try{ ytAutoPlayer.setLoop(loopEl.checked); }catch(e){} }
+            setYtAutoStatus('▶ Memutar hasil pencarian: '+raw);
+          }catch(e){ setYtAutoStatus('❌ Gagal memutar hasil pencarian.'); }
+        });
       }
       // Cuma satu pemutar aktif dalam satu waktu -- matiin Music Request kalau lagi jalan.
       if(chromeMusicPlayer && chromeMusicApiReady){ try{ chromeMusicPlayer.stopVideo(); }catch(e){} chromeMusicCurrentId=null; }

@@ -177,6 +177,55 @@ async function searchYouTube(query) {
   throw new Error("Video YouTube tidak ditemukan.");
 }
 
+// Sama seperti searchYouTube(), tapi mengumpulkan beberapa hasil sekaligus
+// (bukan cuma hasil pertama). Dipakai oleh "YouTube Player (Auto)" supaya
+// kata kunci pencarian bisa diputar sebagai daftar video asli — soalnya
+// fitur bawaan IFrame API `listType:'search'` sudah lama dimatikan YouTube
+// dan selalu balikin error "An error occurred. Please try again later."
+async function searchYouTubeMulti(query, limit = 10) {
+  const https = require("https");
+  const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+  const html = await new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }, res => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", c => data += c);
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.setTimeout(12000, () => { req.destroy(new Error("YouTube search timeout")); });
+  });
+  const marker = "var ytInitialData = ";
+  const start = html.indexOf(marker);
+  if (start < 0) throw new Error("YouTube search tidak tersedia.");
+  const jsonStart = start + marker.length;
+  const end = html.indexOf(";</script>", jsonStart);
+  if (end < 0) throw new Error("Hasil YouTube tidak bisa dibaca.");
+  const data = JSON.parse(html.slice(jsonStart, end));
+  const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+  const results = [];
+  for (const section of contents) {
+    const items = section?.itemSectionRenderer?.contents || [];
+    for (const item of items) {
+      const v = item?.videoRenderer;
+      if (!v?.videoId || !v?.title?.runs?.[0]?.text) continue;
+      const title = v.title.runs.map(x => x.text).join("");
+      const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
+      const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
+      const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+      results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
+      if (results.length >= limit) return results;
+    }
+  }
+  if (!results.length) throw new Error("Video YouTube tidak ditemukan.");
+  return results;
+}
+
 async function addMusicRequest(username, query) {
   const clean = String(query || "").trim().slice(0, 160);
   if (!clean) return { ok:false, message:"Judul lagu kosong." };
@@ -357,6 +406,17 @@ io.on("connection", (socket) => {
     musicNext();
   });
   socket.on("music:state", () => socket.emit("music:update", musicState()));
+  socket.on("ytauto:search", async (query, ack) => {
+    const clean = String(query || "").trim().slice(0, 160);
+    if (typeof ack !== "function") return;
+    if (!clean) { ack({ ok: false, message: "Kata kunci kosong." }); return; }
+    try {
+      const results = await searchYouTubeMulti(clean, 15);
+      ack({ ok: true, results });
+    } catch (err) {
+      ack({ ok: false, message: err?.message || "Gagal mencari di YouTube." });
+    }
+  });
 
   // ---- Fallback playlist ("Auto DJ") ----
   socket.on("music:fallback:get", () => {
