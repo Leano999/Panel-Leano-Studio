@@ -655,7 +655,14 @@
   }
   socket.on('music:update',renderMusic);
   socket.on('music:settings',s=>{ chromeMusicVolume=Math.max(0,Math.min(1,Number(s?.volume ?? 0.75))); const el=document.getElementById('musicVolume'); if(el) el.value=Math.round(chromeMusicVolume*100); const v=document.getElementById('musicVolumeValue'); if(v) v.textContent=Math.round(chromeMusicVolume*100)+'%'; if(chromeMusicPlayer&&chromeMusicApiReady){try{chromeMusicPlayer.setVolume(Math.round(chromeMusicVolume*100));}catch(e){}} });
-  loadChromeYouTubeApi();
+  // FIX PERFORMANCE: loadChromeYouTubeApi() DIHAPUS dari sini.
+  // Sebelumnya baris ini jalan otomatis begitu dashboard dibuka, artinya
+  // iframe YouTube ditanam & aktif terus meskipun fitur music request gak
+  // pernah dipakai. Itu penyebab utama CPU tinggi terus-menerus dan delay
+  // pas pindah/alt-tab browser. Sekarang API+player YouTube baru dimuat
+  // pas user beneran klik tombol "Aktifkan Audio Chrome" (lihat
+  // activateChromeMusic() di atas, yang sudah manggil loadChromeYouTubeApi()
+  // sendiri kalau memang dibutuhkan).
   socket.on('music:request-result',r=>{ logEvent(r?.ok?`Music request masuk: ${r.item?.title||'Lagu'}`:`Music request gagal: ${r?.message||'error'}`); });
   socket.on('event',p=>{ if(p?.kind==='music-request') logEvent(`🎵 @${p.username||'Penonton'} request: ${p.extra||''}`); if(p?.kind==='music-request-error') logEvent(`🎵 Request ditolak @${p.username||'Penonton'}: ${p.extra||''}`); });
   function updateMusicVolume(){
