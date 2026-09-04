@@ -3,6 +3,7 @@ const http = require("http");
 const path = require("path");
 const os = require("os");
 const { Server } = require("socket.io");
+const https = require("https");
 const { setupTiktok } = require("./tiktok");
 const { maybeQueueEffectForGift, registerRobloxRoutes } = require("./roblox-bridge");
 
@@ -11,6 +12,72 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, "public")));
+
+// Neural TTS via Microsoft Azure Speech. Keep the key server-side; never put it in browser JS.
+const AZURE_SPEECH_KEY = process.env.AZURE_SPEECH_KEY || "";
+const AZURE_SPEECH_REGION = process.env.AZURE_SPEECH_REGION || "";
+const AZURE_TTS_VOICE = "id-ID-GadisNeural";
+
+function xmlEscape(value) {
+  return String(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&apos;");
+}
+function pctRate(rate) {
+  const n = Number(rate);
+  const r = Number.isFinite(n) ? Math.max(0.5, Math.min(1.5, n)) : 0.95;
+  const pct = Math.round((r - 1) * 100);
+  return (pct >= 0 ? "+" : "") + pct + "%";
+}
+function stPitch(pitch) {
+  const n = Number(pitch);
+  const p = Number.isFinite(n) ? Math.max(0.5, Math.min(1.5, n)) : 1;
+  const st = Math.round((p - 1) * 4 * 10) / 10;
+  return (st >= 0 ? "+" : "") + st + "st";
+}
+
+app.post("/api/tts", express.text({ type: ["text/plain", "application/json"] }), (req, res) => {
+  if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
+    return res.status(503).json({ ok:false, error:"Azure Speech belum dikonfigurasi. Set AZURE_SPEECH_KEY dan AZURE_SPEECH_REGION." });
+  }
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch (_) { body = { text: body }; }
+  }
+  body = body || {};
+  const text = String(body.text || "").replace(/https?:\/\/\S+/gi, " link ").replace(/\s+/g, " ").trim().slice(0, 500);
+  if (!text) return res.status(400).json({ok:false,error:"Teks kosong."});
+
+  const rate = Number(body.rate) || 0.95;
+  const pitch = Number(body.pitch) || 1;
+  const volume = Math.max(1, Math.min(100, Math.round((Number(body.volume) || 1) * 100)));
+  const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="id-ID"><voice name="${AZURE_TTS_VOICE}"><prosody rate="${pctRate(rate)}" pitch="${stPitch(pitch)}" volume="${volume}">${xmlEscape(text)}</prosody></voice></speak>`;
+  const data = Buffer.from(ssml, "utf8");
+  const options = {
+    hostname: `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`,
+    path: "/cognitiveservices/v1",
+    method: "POST",
+    headers: {
+      "Ocp-Apim-Subscription-Key": AZURE_SPEECH_KEY,
+      "Content-Type": "application/ssml+xml",
+      "X-Microsoft-OutputFormat": "audio-24khz-96kbitrate-mono-mp3",
+      "User-Agent": "LeanoStreamPanel-NeuralTTS/1.0",
+      "Content-Length": data.length,
+    },
+  };
+  const request = https.request(options, r => {
+    const chunks=[];
+    r.on("data", c => chunks.push(c));
+    r.on("end", () => {
+      const audio=Buffer.concat(chunks);
+      if (r.statusCode !== 200) {
+        let msg=audio.toString("utf8").slice(0,500);
+        return res.status(502).json({ok:false,error:`Azure Speech HTTP ${r.statusCode}: ${msg}`});
+      }
+      res.status(200).set("Content-Type","audio/mpeg").set("Cache-Control","no-store").send(audio);
+    });
+  });
+  request.on("error", err => res.status(502).json({ok:false,error:`Azure Speech gagal: ${err.message}`}));
+  request.write(data); request.end();
+});
 registerRobloxRoutes(app);
 
 const tiktok = setupTiktok(io, processEvent);
@@ -25,8 +92,9 @@ let ttsSettings = {
   // Follow/Gift use custom SFX by default, not TTS.
   readFollows: false,
   readGifts: false,
-  voiceName: "",
-  rate: 1,
+  voiceName: "id-ID-GadisNeural",
+  voicePreset: "neural",
+  rate: 0.95,
   pitch: 1,
   volume: 1,
 };
@@ -456,7 +524,8 @@ io.on("connection", (socket) => {
       readLikes: !!payload.readLikes,
       readFollows: payload.readFollows === true,
       readGifts: payload.readGifts === true,
-      voiceName: typeof payload.voiceName === "string" ? payload.voiceName : "",
+      voiceName: "id-ID-GadisNeural",
+      voicePreset: "neural",
       rate: Math.min(2, Math.max(0.5, Number(payload.rate) || 1)),
       pitch: Math.min(2, Math.max(0, Number(payload.pitch) || 1)),
       volume: Math.min(1, Math.max(0, Number(payload.volume) || 1)),

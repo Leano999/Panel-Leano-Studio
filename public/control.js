@@ -16,50 +16,9 @@
   socket.on('connect', () => setPanelConnectionState('BELUM TERHUBUNG', false));
   socket.on('disconnect', () => setPanelConnectionState('SERVER TERPUTUS', false));
 
-  // ---- TTS voice list ----
-  let availableVoices = [];
-  // FIX PERFORMANCE: dulu loadVoiceOptions() selalu bongkar-pasang ulang
-  // SEMUA <option> di dropdown voice dari nol, setiap kali dipanggil.
-  // Fungsi ini dipanggil dari setInterval tiap 1.5 detik SECARA GLOBAL
-  // (bukan cuma pas tab Text-to-Speech kebuka), jadi main thread browser
-  // sering "keblok" sebentar tiap 1.5 detik terus-menerus — ini yang bikin
-  // klik/pindah tab kerasa delay di SEMUA tab, bukan cuma TTS.
-  // Sekarang kita simpan signature (jumlah + nama voice) dari render
-  // terakhir, dan cuma bongkar-pasang ulang dropdown kalau daftar
-  // voice-nya BENERAN berubah. Browser jarang sekali ganti daftar voice
-  // di tengah sesi, jadi harusnya cuma render ulang 1-2 kali pas load awal.
-  let lastVoiceSignature = '';
-  function loadVoiceOptions(){
-    availableVoices = speechSynthesis.getVoices() || [];
-    const select = document.getElementById('ttsVoice');
-    if(!select) return;
-    const signature = availableVoices.map(v => v.name + '|' + v.lang).join(',');
-    if(signature === lastVoiceSignature) return; // gak ada perubahan, skip rebuild DOM
-    lastVoiceSignature = signature;
-    const current = select.value;
-    select.innerHTML = '<option value="">Otomatis — Bahasa Indonesia</option>';
-
-    // Put Google voices first, then Indonesian voices, then the rest.
-    const sorted = [...availableVoices].sort((a,b) => {
-      const score = v => (v.name.toLowerCase().includes('google') ? 6 : 0) + (/^id/i.test(v.lang) ? 4 : 0);
-      return score(b) - score(a) || a.name.localeCompare(b.name);
-    });
-    sorted.forEach(v => {
-      const opt = document.createElement('option');
-      opt.value = v.name;
-      const genderHint = /female|woman|girl/i.test(v.name) ? ' • perempuan'
-        : /male|man|boy/i.test(v.name) ? ' • laki-laki' : '';
-      opt.textContent = `${v.name} — ${v.lang}${genderHint}`;
-      select.appendChild(opt);
-    });
-    if([...select.options].some(o => o.value === current)) select.value = current;
-    document.getElementById('voiceStatus').textContent =
-      availableVoices.length
-        ? `${availableVoices.length} suara tersedia. ${availableVoices.filter(v => /google/i.test(v.name)).length} suara Google terdeteksi.`
-        : 'Browser belum memberikan daftar suara. Coba buka ulang panel.';
-  }
-  loadVoiceOptions();
-  speechSynthesis.onvoiceschanged = loadVoiceOptions;
+  // ---- TTS voice ----
+  // Voice is intentionally fixed: neural Indonesian voice generated server-side.
+  const FIXED_TTS_VOICE = 'id-ID-GadisNeural';
 
   // overlay url
   const overlayUrl = location.origin + '/overlay.html?v=22';
@@ -226,9 +185,10 @@
       readLikes: document.getElementById('ttsReadLikes').checked,
       readFollows: document.getElementById('ttsReadFollows').checked,
       readGifts: document.getElementById('ttsReadGifts').checked,
-      voiceName: document.getElementById('ttsVoice').value,
-      rate: Number(document.getElementById('ttsRate').value),
-      pitch: Number(document.getElementById('ttsPitch').value),
+      voiceName: FIXED_TTS_VOICE,
+      voicePreset: 'neural',
+      rate: Number(document.getElementById('ttsRate').value) || 0.95,
+      pitch: Number(document.getElementById('ttsPitch').value) || 1,
       volume: Number(document.getElementById('ttsVolume').value) / 100,
     };
   }
@@ -239,7 +199,7 @@
     document.getElementById('ttsPitchValue').textContent = settings.pitch.toFixed(2);
     document.getElementById('ttsVolumeValue').textContent = Math.round(settings.volume * 100) + '%';
     socket.emit('tts:settings', settings);
-    logEvent(`TTS: komentar ${settings.readComments ? 'ON' : 'OFF'}, like ${settings.readLikes ? 'ON' : 'OFF'}, follow ${settings.readFollows ? 'ON' : 'OFF'}, gift ${settings.readGifts ? 'ON' : 'OFF'}, suara ${settings.voiceName || 'otomatis'}`);
+    logEvent(`TTS Neural: komentar ${settings.readComments ? 'ON' : 'OFF'}, like ${settings.readLikes ? 'ON' : 'OFF'}, follow ${settings.readFollows ? 'ON' : 'OFF'}, gift ${settings.readGifts ? 'ON' : 'OFF'}`);
   }
 
   socket.on('tts:settings', (settings) => {
@@ -248,133 +208,92 @@
     document.getElementById('ttsReadLikes').checked = !!settings.readLikes;
     document.getElementById('ttsReadFollows').checked = settings.readFollows === true;
     document.getElementById('ttsReadGifts').checked = settings.readGifts === true;
-    document.getElementById('ttsVoice').value = settings.voiceName || '';
-    document.getElementById('ttsRate').value = settings.rate || 1;
+    document.getElementById('ttsRate').value = settings.rate || 0.95;
     document.getElementById('ttsPitch').value = settings.pitch || 1;
     document.getElementById('ttsVolume').value = Math.round((settings.volume == null ? 1 : settings.volume) * 100);
-    document.getElementById('ttsRateValue').textContent = Number(settings.rate || 1).toFixed(2) + 'x';
+    document.getElementById('ttsRateValue').textContent = Number(settings.rate || 0.95).toFixed(2) + 'x';
     document.getElementById('ttsPitchValue').textContent = Number(settings.pitch || 1).toFixed(2);
     document.getElementById('ttsVolumeValue').textContent = Math.round((settings.volume == null ? 1 : settings.volume) * 100) + '%';
   });
 
   // ---- TTS manual/live ----
-  // TTS intentionally runs in the CONTROL PANEL, not in OBS Browser Source.
-  // The first click on "Aktifkan TTS Live" is the real user gesture that
-  // unlocks speechSynthesis; after that, live comments are queued here.
+  // All speech is generated by the server's neural TTS endpoint.
   let ttsUnlocked = false;
   let liveTtsQueue = [];
   let liveTtsBusy = false;
+  let currentAudio = null;
 
-  function selectedVoice(){
-    const wanted = document.getElementById('ttsVoice').value;
-    return availableVoices.find(v => v.name === wanted) ||
-      availableVoices.find(v => /^id-ID$/i.test(v.lang)) ||
-      availableVoices.find(v => /^id/i.test(v.lang)) || null;
+  function ttsPayload(text){
+    const settings=currentTtsSettings();
+    return {text:String(text).slice(0,500), rate:settings.rate, pitch:settings.pitch, volume:settings.volume};
   }
 
-  let sfxUnlocked = false;
-  const sfxAudioCache = {};
-  function unlockSfxAudio(){
-    sfxUnlocked = true;
-    for (const id of ['follow','gift']) {
-      try {
-        const a = sfxAudioCache[id] || new Audio(`/sounds/${id}.mp3?v=16`);
-        a.preload='auto'; a.volume=1; a.muted=true;
-        sfxAudioCache[id]=a;
-        const play=a.play();
-        if(play && play.then) play.then(()=>{a.pause();a.currentTime=0;a.muted=false;}).catch(()=>{});
-      } catch(e){}
+  async function fetchTtsAudio(text){
+    const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(ttsPayload(text))});
+    if(!r.ok){
+      let msg='HTTP '+r.status;
+      try{ const j=await r.json(); if(j.error) msg=j.error; }catch(e){}
+      throw new Error(msg);
+    }
+    return URL.createObjectURL(await r.blob());
+  }
+
+  async function playNeuralTts(text, retry=false){
+    if(!text) return;
+    const url=await fetchTtsAudio(text);
+    if(currentAudio){try{currentAudio.pause();}catch(e){}}
+    const a=new Audio(url);
+    currentAudio=a;
+    a.volume=1;
+    await a.play();
+    await new Promise((resolve,reject)=>{a.onended=resolve; a.onerror=reject;});
+    URL.revokeObjectURL(url);
+  }
+
+  async function unlockTts(){
+    unlockSfxAudio();
+    ttsUnlocked=true;
+    document.getElementById('voiceStatus').textContent='Engine: Microsoft Azure Neural · Voice: id-ID-GadisNeural · AKTIF';
+    document.getElementById('ttsDiagnostic').textContent='Menyiapkan suara neural…';
+    try{
+      await playNeuralTts('TTS neural aktif.');
+      document.getElementById('ttsDiagnostic').textContent='TTS Neural AKTIF. Komentar akan dibaca dengan suara natural.';
+      pumpLiveTts();
+    }catch(e){
+      document.getElementById('ttsDiagnostic').textContent='TTS Neural belum aktif: '+(e.message||e)+' Pastikan AZURE_SPEECH_KEY dan AZURE_SPEECH_REGION sudah diatur di server.';
     }
   }
-  function playLiveSfx(id){
-    if(!sfxUnlocked) return;
-    try {
-      const a=sfxAudioCache[id] || new Audio(`/sounds/${id}.mp3?v=16`);
-      a.preload='auto'; a.volume=1; a.muted=false; a.currentTime=0;
-      sfxAudioCache[id]=a;
-      const p=a.play(); if(p && p.catch) p.catch(()=>{});
-    } catch(e){}
-  }
 
-  function refreshVoices(){
-    try { availableVoices = speechSynthesis.getVoices() || []; } catch(e) { availableVoices=[]; }
-    loadVoiceOptions();
-  }
-
-  function unlockTts(){
-    // This function is called directly by a user click. Do NOT wait for onend
-    // before marking the engine unlocked; Chrome can reject the first utterance
-    // and otherwise every live comment would remain stuck in the queue.
-    unlockSfxAudio();
-    refreshVoices();
-    ttsUnlocked = true;
-    try { speechSynthesis.resume(); } catch(e) {}
-
-    const u = new SpeechSynthesisUtterance('TTS live aktif.');
-    const v = selectedVoice();
-    if(v){ u.voice=v; u.lang=v.lang || 'id-ID'; } else u.lang='id-ID';
-    u.volume=Number(document.getElementById('ttsVolume').value)/100 || 0; u.rate=1; u.pitch=1;
-    u.onend=()=>{ document.getElementById('ttsDiagnostic').textContent='TTS Live AKTIF. Komentar akan dibaca dari panel ini tanpa username.'; };
-    u.onerror=(e)=>{ document.getElementById('ttsDiagnostic').textContent='TTS aktif, tetapi browser menolak suara. Klik "Tes Suara Terpilih" sekali; jika itu juga diam, cek volume/tab mute dan izin audio browser.'; };
-    // Give the browser a moment after resume so the utterance is not lost.
-    setTimeout(()=>{
-      try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch(e) {
-        document.getElementById('ttsDiagnostic').textContent='Gagal menjalankan TTS: '+(e.message||e);
-      }
-    }, 80);
-  }
-
-  function testSelectedVoice(){
-    ttsUnlocked = true;
-    refreshVoices();
-    speakLocal('Ini adalah tes suara TTS. Jika terdengar, TTS Live siap membaca komentar.');
-  }
-
-  function speakLocal(text){
-    if(!text) return;
-    refreshVoices();
-    try { speechSynthesis.resume(); } catch(e) {}
-    const u = new SpeechSynthesisUtterance(String(text));
-    const v = selectedVoice();
-    if(v){ u.voice=v; u.lang=v.lang || 'id-ID'; } else u.lang='id-ID';
-    u.rate=Number(document.getElementById('ttsRate').value)||1;
-    u.pitch=Number(document.getElementById('ttsPitch').value)||1;
-    u.volume=Number(document.getElementById('ttsVolume').value)/100 || 0;
-    u.onerror=(e)=>{ document.getElementById('ttsDiagnostic').textContent='Tes TTS gagal: '+(e.error||'browser menolak audio'); };
-    try { speechSynthesis.speak(u); } catch(e) { document.getElementById('ttsDiagnostic').textContent='Tes TTS gagal: '+(e.message||e); }
+  async function testSelectedVoice(){
+    ttsUnlocked=true;
+    try{ await playNeuralTts('Ini adalah tes suara TTS natural Bahasa Indonesia.'); document.getElementById('ttsDiagnostic').textContent='Tes suara neural berhasil.'; }
+    catch(e){ document.getElementById('ttsDiagnostic').textContent='Tes TTS gagal: '+(e.message||e); }
   }
 
   function queueLiveTts(text){
     if(!text || !ttsUnlocked) return;
-    liveTtsQueue.push(String(text).slice(0,500));
+    liveTtsQueue.push(String(text).replace(/https?:\/\/\S+/gi,' link ').replace(/\s+/g,' ').trim().slice(0,500));
     if(liveTtsQueue.length>20) liveTtsQueue.shift();
     pumpLiveTts();
   }
 
-  function pumpLiveTts(){
+  async function pumpLiveTts(){
     if(liveTtsBusy || !liveTtsQueue.length || !ttsUnlocked) return;
     const text=liveTtsQueue.shift();
-    refreshVoices();
-    const u=new SpeechSynthesisUtterance(text);
-    const v=selectedVoice();
-    if(v){u.voice=v;u.lang=v.lang||'id-ID';} else u.lang='id-ID';
-    u.rate=Number(document.getElementById('ttsRate').value)||1;
-    u.pitch=Number(document.getElementById('ttsPitch').value)||1;
-    u.volume=Number(document.getElementById('ttsVolume').value)/100 || 0;
     liveTtsBusy=true;
-    const done=()=>{ if(!liveTtsBusy)return; liveTtsBusy=false; setTimeout(pumpLiveTts,100); };
-    u.onend=done;
-    u.onerror=()=>{ liveTtsBusy=false; liveTtsQueue.unshift(text); document.getElementById('ttsDiagnostic').textContent='TTS event gagal dibaca; antrean akan dicoba lagi.'; setTimeout(pumpLiveTts,500); };
-    try { speechSynthesis.resume(); speechSynthesis.speak(u); } catch(e) { done(); liveTtsQueue.unshift(text); setTimeout(pumpLiveTts,500); }
+    try{ await playNeuralTts(text); }
+    catch(e){
+      liveTtsQueue.unshift(text);
+      document.getElementById('ttsDiagnostic').textContent='TTS event gagal: '+(e.message||e);
+    }
+    finally{ liveTtsBusy=false; setTimeout(pumpLiveTts,120); }
   }
 
-  speechSynthesis.onvoiceschanged=()=>refreshVoices();
-  setInterval(()=>{ try { if(speechSynthesis.paused) speechSynthesis.resume(); refreshVoices(); if(ttsUnlocked && liveTtsQueue.length && !liveTtsBusy) pumpLiveTts(); } catch(e){} }, 1500);
+  setInterval(()=>{ if(ttsUnlocked && liveTtsQueue.length && !liveTtsBusy) pumpLiveTts(); },1500);
 
   socket.on('event', (payload) => {
     if(!payload || payload.kind !== 'alert') return;
     if(payload.type==='comment' && currentTtsSettings().readComments && payload.extra && !/^!song\s*/i.test(String(payload.extra))){
-      // Read ONLY the comment text; username is intentionally excluded.
       queueLiveTts(payload.extra);
     }
     if(payload.type==='like' && currentTtsSettings().readLikes){
@@ -397,15 +316,15 @@
     const text = document.getElementById('ttsText').value.trim();
     if(!text) return;
     socket.emit('trigger', { kind:'tts', text });
-    logEvent(`TTS manual dikirim: "${text}"`);
+    logEvent(`TTS Neural manual dikirim: "${text}"`);
   }
 
-  function previewTts(){
+  async function previewTts(){
     const text = document.getElementById('ttsText').value.trim();
     if(!text) return;
-    speakLocal(text);
-    ttsUnlocked = true;
-    logEvent('Preview TTS diputar di browser panel.');
+    ttsUnlocked=true;
+    try{ await playNeuralTts(text); logEvent('Preview TTS Neural diputar di browser panel.'); }
+    catch(e){ document.getElementById('ttsDiagnostic').textContent='Preview TTS gagal: '+(e.message||e); }
   }
 
   // ---- Overlay preview/theme ----

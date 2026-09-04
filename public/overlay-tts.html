@@ -1,10 +1,13 @@
-<!doctype html><html lang="id"><head><meta charset="utf-8"><title>Browser Source — TTS Only</title><style>html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden}#b{position:absolute;left:24px;bottom:24px;max-width:520px;padding:12px 15px;border-radius:14px;background:#0f121ce8;border:1px solid #8b6bf275;color:white;font:600 14px Inter,system-ui;display:none}</style></head><body><div id="b"></div><script src="/socket.io/socket.io.js"></script><script>
-const socket=io({ transports: ['websocket'] });let cfg={readComments:true,readLikes:false,readFollows:false,readGifts:false,voiceName:'',rate:1,pitch:1},voices=[],q=[],busy=false,timer=null;
-function lv(){voices=speechSynthesis.getVoices()||[]} lv();speechSynthesis.onvoiceschanged=lv;
-socket.on('tts:settings',x=>{if(x)cfg=x});
-function getv(){let w=(cfg.voiceName||'').trim();return voices.find(v=>v.name===w)||voices.find(v=>/^id-ID$/i.test(v.lang))||voices.find(v=>/^id/i.test(v.lang))||voices.find(v=>/google/i.test(v.name)&&/^id/i.test(v.lang))||null}
-function add(t){if(!t)return;q.push(String(t).slice(0,500));if(q.length>15)q.shift();pump()}
-function pump(){if(busy||!q.length)return;let text=q.shift(),b=document.getElementById('b');b.textContent=text;b.style.display='block';try{speechSynthesis.resume()}catch(e){}let u=new SpeechSynthesisUtterance(text),v=getv();if(v){u.voice=v;u.lang=v.lang}else u.lang='id-ID';u.rate=+cfg.rate||1;u.pitch=+cfg.pitch||1;u.volume=1;busy=true;let done=false;const fin=()=>{if(done)return;done=true;busy=false;b.style.display='none';clearTimeout(timer);setTimeout(pump,100)};u.onend=fin;u.onerror=e=>{if(e?.error==='interrupted'||e?.error==='audio-busy')q.unshift(text);fin()};try{speechSynthesis.cancel();speechSynthesis.resume();speechSynthesis.speak(u);timer=setTimeout(()=>{if(busy&&!speechSynthesis.speaking){try{speechSynthesis.cancel()}catch(e){}busy=false;q.unshift(text);pump()}},3500)}catch(e){fin()}}
-setInterval(()=>{try{if(speechSynthesis.paused)speechSynthesis.resume();lv();if(q.length&&!busy)pump()}catch(e){}},1000);
-socket.on('event',p=>{if(!p)return;if(p.kind==='tts'){add(p.text);return}if(p.kind==='alert'&&p.type==='comment'&&cfg.readComments&&p.extra){add(p.extra)}else if(p.kind==='alert'&&p.type==='like'&&cfg.readLikes){add(p.count>1?`Ada ${p.count} like masuk.`:'Ada yang mengirim like.')}});
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><title>Browser Source — TTS Natural</title>
+<style>html,body{margin:0;width:100%;height:100%;background:transparent;overflow:hidden}#b{position:absolute;left:24px;bottom:24px;max-width:520px;padding:12px 15px;border-radius:14px;background:#0f121ce8;border:1px solid #8b6bf275;color:white;font:600 14px Inter,system-ui;display:none}</style>
+</head><body><div id="b"></div><script src="/socket.io/socket.io.js"></script><script>
+const socket=io({transports:['websocket']});
+let cfg={readComments:true,readLikes:false,readFollows:false,readGifts:false,rate:.95,pitch:1,volume:1},q=[],busy=false;
+function clean(t){return String(t||'').replace(/https?:\/\/\S+/gi,' link ').replace(/\s+/g,' ').trim().slice(0,500)}
+async function getAudio(text){const r=await fetch('/api/tts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text:clean(text),rate:cfg.rate,pitch:cfg.pitch,volume:cfg.volume})});if(!r.ok){let m='HTTP '+r.status;try{const j=await r.json();if(j.error)m=j.error}catch(e){}throw Error(m)}return URL.createObjectURL(await r.blob())}
+function add(t){t=clean(t);if(!t)return;q.push(t);if(q.length>15)q.shift();pump()}
+async function pump(){if(busy||!q.length)return;busy=true;const text=q.shift(),b=document.getElementById('b');b.textContent=text;b.style.display='block';try{const url=await getAudio(text);const a=new Audio(url);a.volume=1;await a.play();await new Promise((resolve,reject)=>{a.onended=resolve;a.onerror=reject});URL.revokeObjectURL(url)}catch(e){q.unshift(text);console.warn('TTS Neural:',e)}finally{busy=false;b.style.display='none';setTimeout(pump,120)}}
+socket.on('tts:settings',x=>{if(x)cfg={...cfg,...x}});
+socket.on('event',p=>{if(!p)return;if(p.kind==='tts'){add(p.text);return}if(p.kind==='alert'&&p.type==='comment'&&cfg.readComments&&p.extra)add(p.extra);else if(p.kind==='alert'&&p.type==='like'&&cfg.readLikes)add(p.count>1?`Ada ${p.count} like masuk.`:'Ada yang mengirim like.')});
 </script></body></html>

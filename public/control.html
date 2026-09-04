@@ -391,23 +391,18 @@
     </div>
 
     <div class="field" style="border-top:1px solid var(--line); padding-top:20px;">
-      <label>PILIH SUARA</label>
-      <select id="ttsVoice" onchange="updateTtsSettings()">
-        <option value="">Otomatis — Bahasa Indonesia</option>
-      </select>
-      <div class="voice-status" id="voiceStatus">Mencari suara yang tersedia di browser…</div>
+      <label>SUARA TTS</label>
+      <div class="voice-status" style="font-size:15px; padding:12px 14px; border:1px solid var(--line); border-radius:10px;">
+        <b>IndoFinity Natural</b> · Microsoft Neural · Bahasa Indonesia
+      </div>
+      <div class="voice-status" id="voiceStatus">Engine: Microsoft Azure Neural · Voice: id-ID-GadisNeural</div>
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;">
         <button class="btn" onclick="unlockTts()">🔊 Aktifkan TTS Live</button>
-        <button class="btn" onclick="testSelectedVoice()">Tes Suara Terpilih</button>
+        <button class="btn" onclick="testSelectedVoice()">Tes Suara Natural</button>
       </div>
       <div class="hint" id="ttsDiagnostic" style="margin-top:7px;">
-        TTS komentar LIVE berjalan dari panel ini setelah tombol "Aktifkan TTS Live" ditekan sekali. Ini menghindari blokir autoplay pada Browser Source OBS.
+        TTS sekarang memakai engine neural server-side, bukan suara browser. Suara dikunci ke preset natural Bahasa Indonesia agar hasil konsisten di OBS/Linux/Windows.
       </div>
-      <p class="hint">
-        Daftar ini mengikuti suara yang tersedia di komputer/browser. Jika Chrome menyediakan
-        suara Google, biasanya akan muncul sebagai <b>Google ...</b>. Suara perempuan/laki-laki
-        yang tersedia juga akan muncul di sini.
-      </p>
     </div>
 
     <div class="row" style="gap:16px; flex-wrap:wrap;">
@@ -422,7 +417,7 @@
         <div class="voice-status"><span id="ttsPitchValue">1.00</span></div>
       </div>
       <div class="field" style="flex:1; min-width:220px; margin:0;">
-        <label>VOLUME GOOGLE TTS</label>
+        <label>VOLUME TTS</label>
         <input type="range" id="ttsVolume" min="0" max="100" step="1" value="100" oninput="updateTtsSettings()">
         <div class="voice-status"><span id="ttsVolumeValue">100%</span></div>
       </div>
