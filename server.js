@@ -188,13 +188,35 @@ async function searchYouTube(query) {
 // "ngulang-ngulang lagu yang sama" walau sebenarnya videoId-nya beda-beda.
 // Fungsi ini menyamakan title jadi bentuk polos (tanpa tag [...]/(...) dan
 // tanda baca) buat dipakai sebagai kunci dedupe.
-function normalizeTitleKey(title) {
-  return String(title || "")
-    .toLowerCase()
-    .replace(/[\[(].*?[\])]/g, " ")
-    .replace(/\b(official|video|audio|lyrics?|lyric video|mv|m\/v|hd|hq|4k|visualizer)\b/g, " ")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
+// Judul di hasil pencarian YouTube sering ada BANYAK versi dari lagu yang
+// sama persis (official audio, lyric video, cover, slowed+reverb, nightcore,
+// radio edit, dll) yang TIDAK identik teksnya, tapi kalau kata "pengisi"-nya
+// dibuang, sisa kata intinya (nama lagu + artis) sama. Makanya perbandingan
+// di sini pakai kemiripan kata inti (token overlap), bukan kesamaan teks
+// persis -- biar gak kejadian lagi kasus playlist isinya "Losing Us" doang
+// diulang-ulang walau videoId-nya beda-beda tiap kali.
+const TITLE_FILLER_WORDS = new Set([
+  "official","video","audio","lyrics","lyric","mv","hd","hq","4k","visualizer",
+  "cover","remix","slowed","reverb","sped","nightcore","karaoke","instrumental",
+  "acoustic","live","extended","clean","explicit","radio","edit","version","ver",
+  "ft","feat","featuring","with","the","a","an","of","and","x","prod","by",
+  "lofi","dance","choreography","full","song","tiktok","viral","music","videos",
+  "8d","bass","boosted","hour","loop","trap","type","beat","reaction","performance",
+  "original","new","hits","1080p","720p"
+]);
+function titleTokens(title) {
+  let t = String(title || "").toLowerCase();
+  t = t.replace(/[\[(].*?[\])]/g, " ");
+  t = t.replace(/[^a-z0-9\s]/g, " ");
+  return new Set(t.split(/\s+/).filter(w => w && w.length > 1 && !TITLE_FILLER_WORDS.has(w)));
+}
+function isSimilarTitle(tokensA, existingTokenSets) {
+  for (const tokensB of existingTokenSets) {
+    const inter = [...tokensA].filter(w => tokensB.has(w)).length;
+    const union = new Set([...tokensA, ...tokensB]).size;
+    if (union > 0 && inter / union >= 0.5) return true;
+  }
+  return false;
 }
 
 async function searchYouTubeMulti(query, limit = 10) {
@@ -224,9 +246,9 @@ async function searchYouTubeMulti(query, limit = 10) {
   const data = JSON.parse(html.slice(jsonStart, end));
   const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
   const results = [];
-  const seenTitleKeys = new Set();
   const seenVideoIds = new Set();
-  const rawLimit = limit * 4; // scan pool lebih besar dulu, baru difilter dedupe
+  const keptTokenSets = [];
+  const rawLimit = limit * 6; // pool lebih besar, karena banyak yang bakal kesaring dedupe kemiripan
   let scanned = 0;
   outer:
   for (const section of contents) {
@@ -237,13 +259,13 @@ async function searchYouTubeMulti(query, limit = 10) {
       scanned += 1;
       if (seenVideoIds.has(v.videoId)) { if (scanned >= rawLimit) break outer; continue; }
       const title = v.title.runs.map(x => x.text).join("");
-      const titleKey = normalizeTitleKey(title);
-      if (titleKey && seenTitleKeys.has(titleKey)) { if (scanned >= rawLimit) break outer; continue; } // skip versi duplikat (official/lyrics/audio dll)
+      const tokens = titleTokens(title);
+      if (tokens.size && isSimilarTitle(tokens, keptTokenSets)) { if (scanned >= rawLimit) break outer; continue; }
       const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
       const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
       const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
       seenVideoIds.add(v.videoId);
-      if (titleKey) seenTitleKeys.add(titleKey);
+      if (tokens.size) keptTokenSets.push(tokens);
       results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
       if (results.length >= limit || scanned >= rawLimit) break outer;
     }
@@ -432,12 +454,14 @@ io.on("connection", (socket) => {
     musicNext();
   });
   socket.on("music:state", () => socket.emit("music:update", musicState()));
-  socket.on("ytauto:search", async (query, ack) => {
-    const clean = String(query || "").trim().slice(0, 160);
+  socket.on("ytauto:search", async (payload, ack) => {
+    const isObj = payload && typeof payload === "object";
+    const clean = String(isObj ? payload.query : payload || "").trim().slice(0, 160);
+    const limit = Math.max(3, Math.min(30, Number(isObj ? payload.limit : 15) || 15));
     if (typeof ack !== "function") return;
     if (!clean) { ack({ ok: false, message: "Kata kunci kosong." }); return; }
     try {
-      const results = await searchYouTubeMulti(clean, 15);
+      const results = await searchYouTubeMulti(clean, limit);
       ack({ ok: true, results });
     } catch (err) {
       ack({ ok: false, message: err?.message || "Gagal mencari di YouTube." });

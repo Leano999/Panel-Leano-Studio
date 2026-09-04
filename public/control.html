@@ -500,6 +500,19 @@
         tetap auto lanjut ke video berikutnya sendiri.
       </p>
       <div class="field" style="margin-top:16px;">
+        <label>GENRE CEPAT (opsional)</label>
+        <div class="row" style="flex-wrap:wrap;gap:8px;">
+          <button class="btn secondary" type="button" onclick="playYtGenre('classic')">🎻 Klasik</button>
+          <button class="btn secondary" type="button" onclick="playYtGenre('dj')">🎧 DJ / Remix</button>
+          <button class="btn secondary" type="button" onclick="playYtGenre('barat')">🌍 Barat / English</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">
+          Tombol ini otomatis cari & acak (shuffle) lagu-lagu dalam genre itu aja — gak nyampur
+          sama genre lain. Loop otomatis dinyalakan biar terus lanjut. Mau genre lain? Ketik kata
+          kunci sendiri di kolom bawah, misalnya "dangdut koplo" atau "lofi hip hop".
+        </p>
+      </div>
+      <div class="field" style="margin-top:16px;">
         <label>PLAYLIST ATAU KATA KUNCI</label>
         <div class="row" style="flex-wrap:wrap;gap:8px;">
           <input id="ytAutoInput" type="text" placeholder="Tempel link playlist YouTube, ATAU ketik kata kunci mis. 'lofi hip hop radio'" style="flex:1;min-width:220px">

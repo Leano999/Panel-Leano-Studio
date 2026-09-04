@@ -702,7 +702,10 @@
     const m = text.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
     return m ? m[1] : null;
   }
-  function loadYoutubeAutoQuery(raw){
+  function loadYoutubeAutoQuery(raw, opts){
+    opts = opts || {};
+    const searchLimit = opts.limit || 15;
+    const displayLabel = opts.label || raw;
     if(!ytAutoApiReady || !ytAutoPlayer){ ytAutoPending=raw; loadChromeYouTubeApi(); return; }
     const playlistId = extractPlaylistId(raw);
     const looksLikeUrl = /^https?:\/\//i.test(raw);
@@ -728,8 +731,8 @@
         // again later."). Jadi kita cari videonya sendiri lewat server
         // (endpoint yang sama dipakai Music Request), lalu masukkan hasilnya
         // sebagai daftar video ID asli ke player -- ini tetap didukung YouTube.
-        setYtAutoStatus('⏳ Mencari: '+raw);
-        socket.emit('ytauto:search', raw, function(res){
+        setYtAutoStatus('⏳ Mencari: '+displayLabel);
+        socket.emit('ytauto:search', {query: raw, limit: searchLimit}, function(res){
           if(!res || !res.ok || !res.results || !res.results.length){
             setYtAutoStatus('❌ '+((res && res.message) || 'Tidak ada hasil untuk kata kunci itu.'));
             return;
@@ -742,9 +745,12 @@
             // Hasil pencarian urutannya selalu sama tiap kali (gak kayak YouTube
             // beneran yang personalized) -- jadi diacak di sini pakai fitur
             // shuffle bawaan YouTube player biar gak kerasa muter itu-itu aja.
+            // Shuffle-nya cuma di dalam hasil query ini sendiri, jadi kalau
+            // query-nya genre tertentu (klasik/dj/barat dll), yang keacak juga
+            // cuma lagu-lagu dalam genre itu -- gak nyampur genre lain.
             const shuffleEl = document.getElementById('ytAutoShuffle');
             setTimeout(()=>{ try{ ytAutoPlayer.setShuffle(!shuffleEl || shuffleEl.checked); }catch(e){} }, 400);
-            setYtAutoStatus('▶ Memutar hasil pencarian (diacak): '+raw);
+            setYtAutoStatus('▶ Memutar ('+ids.length+' lagu, diacak): '+displayLabel);
           }catch(e){ setYtAutoStatus('❌ Gagal memutar hasil pencarian.'); }
         });
       }
@@ -752,6 +758,26 @@
       if(chromeMusicPlayer && chromeMusicApiReady){ try{ chromeMusicPlayer.stopVideo(); }catch(e){} chromeMusicCurrentId=null; }
       socket.emit('music:stop');
     }catch(e){ setYtAutoStatus('❌ Gagal memutar. Coba playlist/kata kunci lain.'); }
+  }
+  // Preset genre -- masing-masing punya kata kunci pencarian sendiri biar
+  // hasilnya konsisten satu genre, bukan campur aduk. Loop & shuffle otomatis
+  // dinyalakan supaya langsung jalan terus-menerus tanpa perlu diklik ulang.
+  const YT_GENRE_PRESETS = {
+    classic: { label: 'Musik Klasik', query: 'musik klasik instrumental terbaik' },
+    dj: { label: 'DJ / Remix', query: 'dj remix nonstop terbaru' },
+    barat: { label: 'Lagu Barat / English', query: 'english songs playlist terpopuler' }
+  };
+  function playYtGenre(key){
+    const preset = YT_GENRE_PRESETS[key];
+    if(!preset) return;
+    const inputEl = document.getElementById('ytAutoInput');
+    if(inputEl) inputEl.value = preset.query;
+    const loopEl = document.getElementById('ytAutoLoop');
+    if(loopEl){ loopEl.checked = true; }
+    const shuffleEl = document.getElementById('ytAutoShuffle');
+    if(shuffleEl){ shuffleEl.checked = true; }
+    if(!ytAutoActivated) activateYtAuto();
+    loadYoutubeAutoQuery(preset.query, { limit: 25, label: preset.label });
   }
   function playYoutubeAuto(){
     const raw = document.getElementById('ytAutoInput').value.trim();
