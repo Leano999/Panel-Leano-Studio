@@ -17,29 +17,26 @@
 const crypto = require("crypto");
 
 // ------------------------------------------------------------
-// MAPPING GIFT -> EFEK ROBLOX
+// MAPPING GIFT -> TOMBOL KEYBIND
 // ------------------------------------------------------------
 // "giftName" HARUS PERSIS SAMA dengan nama gift TikTok aslinya
 // (case-sensitive). Kalau nama gift TikTok "Rose", tulis "Rose",
 // bukan "rose" atau "ROSE".
 //
-// "effect" harus salah satu nama efek yang sudah dikenali oleh
-// runEffect() di server script Roblox (Jail, Unjail, Freeze,
-// Unfreeze, Flatten, Explode, PushLeft, PushRight, Respawn, Smite,
-// Rocket, Pipe, Brazilian, UnBrazil, NailongPunch, UFO, Flip).
+// "key" adalah nama tombol KeyCode Roblox (P, J, F, ONE, SPACE, dst —
+// sama seperti yang kamu ketik di kolom "ShortCut" pas nyimpen
+// keybind di StreamerPanel in-game). Gift ini nanti akan "menekan"
+// tombol itu untuk STREAM_TARGET_USERNAME — efek apa yang jalan
+// SEPENUHNYA ikut keybind yang sudah kamu atur sendiri di game untuk
+// tombol tersebut (termasuk durasi/time-nya). Kalau tombol itu belum
+// ada keybind-nya di in-game, gift ini gak akan ngapa-ngapain (cuma
+// muncul warning di Output Roblox Studio).
 //
-// "time" cuma dipakai untuk efek yang butuh durasi (Jail, Freeze,
-// Flatten, Explode). Efek lain boleh tidak usah diisi "time".
-//
-// Silakan ubah/tambah baris di bawah ini sesuka hati.
-const GIFT_EFFECT_MAP = {
-  "Rose": { effect: "Jail", time: 15 },
-  "Perfume": { effect: "Freeze", time: 10 },
-  "GG": { effect: "Explode", time: 5 },
-  "Universe": { effect: "UFO" },
-  "Lion": { effect: "Smite" },
-  "Galaxy": { effect: "Rocket" },
-  "TikTok": { effect: "Flip" },
+// Silakan ubah/tambah baris di bawah ini sesuka hati — kamu atur
+// efek + durasi masing-masing tombol langsung dari StreamerPanel
+// di dalam game, bukan dari sini lagi.
+const GIFT_KEY_MAP = {
+  "Rose": "P",
 };
 
 // ------------------------------------------------------------
@@ -61,20 +58,20 @@ function timingSafeEqual(a, b) {
 }
 
 // Dipanggil dari server.js setiap ada event masuk ke processEvent().
-// Kalau event itu gift dan namanya ada di GIFT_EFFECT_MAP, dimasukkan
-// ke antrian buat diambil Roblox nanti.
+// Kalau event itu gift dan namanya ada di GIFT_KEY_MAP, dimasukkan
+// ke antrian buat diambil Roblox nanti (isinya tombol yang mau
+// "ditekan", bukan efek langsung).
 function maybeQueueEffectForGift(payload) {
   if (!payload || payload.type !== "gift") return;
 
   const giftName = payload.giftName || "";
-  const mapping = GIFT_EFFECT_MAP[giftName];
-  if (!mapping) return; // gift ini gak di-mapping, dilewati
+  const key = GIFT_KEY_MAP[giftName];
+  if (!key) return; // gift ini gak di-mapping, dilewati
 
   seq += 1;
   queue.push({
     id: seq,
-    effect: mapping.effect,
-    time: mapping.time || 0,
+    key,
     username: payload.username || "",
     giftName,
     count: payload.count || 1,
@@ -86,7 +83,7 @@ function maybeQueueEffectForGift(payload) {
   }
 
   console.log(
-    `[roblox-bridge] Antri efek "${mapping.effect}" dari gift "${giftName}" (${payload.username || "?"})`
+    `[roblox-bridge] Antri tombol "${key}" dari gift "${giftName}" (${payload.username || "?"})`
   );
 }
 
@@ -119,8 +116,8 @@ function registerRobloxRoutes(app) {
   // Endpoint kecil buat ngecek bridge ini hidup atau enggak
   // (buka aja di browser: https://domain-lo.up.railway.app/roblox/health)
   app.get("/roblox/health", (req, res) => {
-    res.json({ ok: true, queued: queue.length, mappedGifts: Object.keys(GIFT_EFFECT_MAP) });
+    res.json({ ok: true, queued: queue.length, mappedGifts: Object.keys(GIFT_KEY_MAP) });
   });
 }
 
-module.exports = { maybeQueueEffectForGift, registerRobloxRoutes, GIFT_EFFECT_MAP };
+module.exports = { maybeQueueEffectForGift, registerRobloxRoutes, GIFT_KEY_MAP };

@@ -79,6 +79,51 @@ let musicRequestCooldown = new Map();
 let musicSearchBusy = false;
 let musicSettings = { volume: 0.75 };
 
+// ------------------------------------------------------------
+// FALLBACK PLAYLIST ("Auto DJ") — daftar lagu yang streamer siapkan
+// sekali, lalu otomatis diputar bergiliran SETIAP KALI antrian
+// request dari penonton kosong. Streamer gak perlu buka panel
+// berulang-ulang buat isi request sendiri.
+// ------------------------------------------------------------
+let fallbackPlaylist = []; // array of query strings, in-memory (reset kalau server restart)
+let fallbackCursor = 0;
+let fallbackEnabled = true;
+let fallbackBusy = false;
+const FALLBACK_MAX = 30;
+
+function fallbackState() {
+  return { items: fallbackPlaylist, enabled: fallbackEnabled };
+}
+function broadcastFallback() { io.emit("music:fallback:update", fallbackState()); }
+
+// Coba mainkan lagu berikutnya dari fallbackPlaylist (round-robin).
+// Kalau satu lagu gagal dicari (mis. video ditarik/error), otomatis
+// coba lagu berikutnya di daftar, sampai maksimal sepanjang daftar itu
+// sendiri (biar gak infinite loop kalau semuanya gagal).
+async function playNextFallbackSong() {
+  if (fallbackBusy || !fallbackPlaylist.length || musicCurrent) return;
+  fallbackBusy = true;
+  try {
+    let attempts = 0;
+    while (attempts < fallbackPlaylist.length) {
+      const query = fallbackPlaylist[fallbackCursor % fallbackPlaylist.length];
+      fallbackCursor = (fallbackCursor + 1) % fallbackPlaylist.length;
+      attempts += 1;
+      try {
+        const found = await searchYouTube(query);
+        musicCurrent = { ...found, requestedBy: "Auto DJ", query, id: `${found.videoId}-${Date.now()}` };
+        broadcastMusic();
+        return;
+      } catch (err) {
+        console.warn("[fallback] gagal cari lagu:", query, err?.message || err);
+        // lanjut coba lagu berikutnya di playlist
+      }
+    }
+  } finally {
+    fallbackBusy = false;
+  }
+}
+
 function musicState() {
   return {
     current: musicCurrent,
@@ -148,7 +193,10 @@ async function addMusicRequest(username, query) {
     const found = await searchYouTube(clean);
     const item = { ...found, requestedBy: String(username || "Penonton"), query: clean, id: `${found.videoId}-${Date.now()}` };
     musicRequestCooldown.set(key, now + MUSIC_COOLDOWN_MS);
-    if (!musicCurrent) {
+    // Request beneran dari penonton diprioritaskan di atas Auto DJ —
+    // kalau yang lagi main sekarang cuma lagu isian dari fallback
+    // playlist, langsung ganti ke lagu yang direquest ini.
+    if (!musicCurrent || musicCurrent.requestedBy === "Auto DJ") {
       musicCurrent = item;
     } else {
       musicQueue.push(item);
@@ -165,6 +213,9 @@ async function addMusicRequest(username, query) {
 function musicNext() {
   musicCurrent = musicQueue.shift() || null;
   broadcastMusic();
+  if (!musicCurrent && fallbackEnabled && fallbackPlaylist.length) {
+    playNextFallbackSong();
+  }
 }
 
 // Likes can arrive very rapidly (real TikTok likes or the leaderboard
@@ -306,6 +357,38 @@ io.on("connection", (socket) => {
     musicNext();
   });
   socket.on("music:state", () => socket.emit("music:update", musicState()));
+
+  // ---- Fallback playlist ("Auto DJ") ----
+  socket.on("music:fallback:get", () => {
+    socket.emit("music:fallback:update", fallbackState());
+    // Kalau panel baru connect dan gak ada apa-apa yang lagi main,
+    // langsung nyalain auto DJ (biar gak sunyi dari awal buka panel).
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length && fallbackPlaylist.length) {
+      playNextFallbackSong();
+    }
+  });
+  socket.on("music:fallback:add", ({ query } = {}) => {
+    const clean = String(query || "").trim().slice(0, 160);
+    if (!clean || fallbackPlaylist.length >= FALLBACK_MAX) return;
+    fallbackPlaylist.push(clean);
+    broadcastFallback();
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length) playNextFallbackSong();
+  });
+  socket.on("music:fallback:remove", ({ index } = {}) => {
+    if (typeof index === "number" && fallbackPlaylist[index] !== undefined) {
+      fallbackPlaylist.splice(index, 1);
+      broadcastFallback();
+    }
+  });
+  socket.on("music:fallback:clear", () => {
+    fallbackPlaylist = [];
+    broadcastFallback();
+  });
+  socket.on("music:fallback:toggle", ({ enabled } = {}) => {
+    fallbackEnabled = !!enabled;
+    broadcastFallback();
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length) playNextFallbackSong();
+  });
 
   socket.on("tiktok:connect", async ({ username, signApiKey } = {}) => {
     // Starting a new LIVE session must start the chat feed from zero.

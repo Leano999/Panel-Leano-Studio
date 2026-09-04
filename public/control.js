@@ -608,28 +608,49 @@
     document.head.appendChild(s);
   }
   window.onYouTubeIframeAPIReady=function(){
-    if(chromeMusicApiReady) return;
-    chromeMusicApiReady=true;
-    chromeMusicPlayer=new YT.Player('controlMusicPlayer',{
-      width:'100%',height:'270',videoId:'',
-      playerVars:{autoplay:0,controls:1,rel:0,playsinline:1,modestbranding:1},
-      events:{
-        onReady:function(){
-          try{ chromeMusicPlayer.setVolume(Math.round(chromeMusicVolume*100)); try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} }catch(e){}
-          if(chromeMusicPending && chromeMusicActivated) playChromeMusic(chromeMusicPending);
-        },
-        onStateChange:function(e){
-          if(e.data===YT.PlayerState.PLAYING){ try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} setChromeMusicStatus('🔊 Musik sedang bunyi dari Chrome · target 144p',true); }
-          if(e.data===YT.PlayerState.ENDED && chromeMusicCurrentId){
-            const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id});
+    if(!chromeMusicApiReady && document.getElementById('controlMusicPlayer')){
+      chromeMusicApiReady=true;
+      chromeMusicPlayer=new YT.Player('controlMusicPlayer',{
+        width:'100%',height:'270',videoId:'',
+        playerVars:{autoplay:0,controls:1,rel:0,playsinline:1,modestbranding:1},
+        events:{
+          onReady:function(){
+            try{ chromeMusicPlayer.setVolume(Math.round(chromeMusicVolume*100)); try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} }catch(e){}
+            if(chromeMusicPending && chromeMusicActivated) playChromeMusic(chromeMusicPending);
+          },
+          onStateChange:function(e){
+            if(e.data===YT.PlayerState.PLAYING){ try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} setChromeMusicStatus('🔊 Musik sedang bunyi dari Chrome · target 144p',true); }
+            if(e.data===YT.PlayerState.ENDED && chromeMusicCurrentId){
+              const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id});
+            }
+          },
+          onError:function(){
+            setChromeMusicStatus('❌ YouTube gagal memainkan video ini');
+            if(chromeMusicCurrentId){ const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id}); }
           }
-        },
-        onError:function(){
-          setChromeMusicStatus('❌ YouTube gagal memainkan video ini');
-          if(chromeMusicCurrentId){ const id=chromeMusicCurrentId; chromeMusicCurrentId=null; socket.emit('music:ended',{videoId:id}); }
         }
-      }
-    });
+      });
+    }
+    if(!ytAutoApiReady && document.getElementById('ytAutoPlayer')){
+      ytAutoApiReady=true;
+      ytAutoPlayer=new YT.Player('ytAutoPlayer',{
+        width:'100%',height:'270',
+        playerVars:{autoplay:0,controls:1,rel:0,playsinline:1,modestbranding:1},
+        events:{
+          onReady:function(){
+            try{ ytAutoPlayer.setVolume(Math.round(chromeMusicVolume*100)); }catch(e){}
+            if(ytAutoPending){ const q=ytAutoPending; ytAutoPending=null; loadYoutubeAutoQuery(q); }
+          },
+          onStateChange:function(e){
+            if(e.data===YT.PlayerState.PLAYING){ setYtAutoStatus('🔊 Sedang muter dari YouTube Player',true); }
+          },
+          onError:function(){
+            setYtAutoStatus('❌ Ada video yang gagal diputar, lanjut ke berikutnya…');
+            try{ ytAutoPlayer.nextVideo(); }catch(e){}
+          }
+        }
+      });
+    }
   };
   function activateChromeMusic(){
     chromeMusicActivated=true;
@@ -646,12 +667,79 @@
     if(chromeMusicCurrentId===item.videoId) return;
     chromeMusicCurrentId=item.videoId;
     setChromeMusicStatus('⏳ Memutar: '+(item.title||'Lagu'));
+    // Cuma satu pemutar aktif dalam satu waktu -- hentikan YouTube Player (auto) kalau lagi jalan.
+    if(ytAutoPlayer && ytAutoApiReady){ try{ ytAutoPlayer.pauseVideo(); }catch(e){} }
     try{
       chromeMusicPlayer.setVolume(Math.round(chromeMusicVolume*100));
       chromeMusicPlayer.loadVideoById({videoId:item.videoId,startSeconds:0,suggestedQuality:'tiny'});
       setTimeout(()=>{ try{ chromeMusicPlayer.setPlaybackQuality('tiny'); }catch(e){} }, 1200);
       chromeMusicPlayer.playVideo();
     }catch(e){ setChromeMusicStatus('❌ Gagal memulai audio Chrome'); }
+  }
+
+  // ---- YouTube Player (Auto, tanpa request) ----
+  let ytAutoPlayer=null;
+  let ytAutoApiReady=false;
+  let ytAutoActivated=false;
+  let ytAutoPending=null;
+  function setYtAutoStatus(text, ok=false){
+    const el=document.getElementById('ytAutoStatus');
+    if(el){ el.textContent=text; el.style.color=ok ? '#39d98a' : ''; }
+  }
+  function activateYtAuto(){
+    ytAutoActivated=true;
+    const b=document.getElementById('ytAutoActivateBtn');
+    if(b){ b.textContent='✅ Audio Chrome Aktif'; b.disabled=true; }
+    setYtAutoStatus('YouTube Player aktif',true);
+    loadChromeYouTubeApi();
+    if(ytAutoPending && ytAutoApiReady){ const q=ytAutoPending; ytAutoPending=null; loadYoutubeAutoQuery(q); }
+  }
+  function extractPlaylistId(text){
+    const m = text.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+    return m ? m[1] : null;
+  }
+  function extractVideoId(text){
+    const m = text.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+    return m ? m[1] : null;
+  }
+  function loadYoutubeAutoQuery(raw){
+    if(!ytAutoApiReady || !ytAutoPlayer){ ytAutoPending=raw; loadChromeYouTubeApi(); return; }
+    const playlistId = extractPlaylistId(raw);
+    const looksLikeUrl = /^https?:\/\//i.test(raw);
+    try{
+      ytAutoPlayer.setVolume(Math.round(chromeMusicVolume*100));
+      if(playlistId){
+        ytAutoPlayer.loadPlaylist({listType:'playlist', list: playlistId});
+        setYtAutoStatus('▶ Memutar playlist…');
+      } else if(looksLikeUrl){
+        const vid = extractVideoId(raw);
+        if(vid){
+          ytAutoPlayer.loadVideoById({videoId: vid});
+          setYtAutoStatus('▶ Memutar video (video tunggal, gak lanjut otomatis ke video lain)');
+        } else {
+          setYtAutoStatus('❌ Link tidak dikenali. Pakai link playlist atau kata kunci biasa.');
+          return;
+        }
+      } else {
+        ytAutoPlayer.loadPlaylist({listType:'search', list: raw});
+        setYtAutoStatus('▶ Memutar hasil pencarian: '+raw);
+      }
+      // Cuma satu pemutar aktif dalam satu waktu -- matiin Music Request kalau lagi jalan.
+      if(chromeMusicPlayer && chromeMusicApiReady){ try{ chromeMusicPlayer.stopVideo(); }catch(e){} chromeMusicCurrentId=null; }
+      socket.emit('music:stop');
+    }catch(e){ setYtAutoStatus('❌ Gagal memutar. Coba playlist/kata kunci lain.'); }
+  }
+  function playYoutubeAuto(){
+    const raw = document.getElementById('ytAutoInput').value.trim();
+    if(!raw) return;
+    if(!ytAutoActivated) activateYtAuto();
+    loadYoutubeAutoQuery(raw);
+  }
+  function toggleYtAutoLoop(){
+    const on = document.getElementById('ytAutoLoop').checked;
+    if(ytAutoPlayer && ytAutoApiReady){
+      try{ ytAutoPlayer.setLoop(on); }catch(e){}
+    }
   }
 
   function copyMusicUrl(){ navigator.clipboard?.writeText(document.getElementById('musicUrl').textContent); logEvent('URL OBS Music Request (visual only) disalin.'); }

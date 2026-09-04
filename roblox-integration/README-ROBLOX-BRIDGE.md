@@ -14,23 +14,25 @@ Kalau belum pernah deploy sama sekali, kasih tau saja, nanti disesuaikan.
    - `server.js` (menimpa yang lama — sudah termasuk 2 baris tambahan
      yang manggil `roblox-bridge.js`)
 
-2. Buka `roblox-bridge.js`, cari bagian `GIFT_EFFECT_MAP`. Sesuaikan nama
-   gift TikTok (harus persis, termasuk huruf besar/kecil) dengan efek
-   Roblox yang lo mau. Contoh yang sudah disiapkan:
+2. Buka `roblox-bridge.js`, cari bagian `GIFT_KEY_MAP`. Sesuaikan nama
+   gift TikTok (harus persis, termasuk huruf besar/kecil) dengan tombol
+   keybind yang mau "ditekan" pas gift itu masuk. Contoh:
 
    ```js
-   const GIFT_EFFECT_MAP = {
-     "Rose": { effect: "Jail", time: 15 },
-     "Perfume": { effect: "Freeze", time: 10 },
-     "GG": { effect: "Explode", time: 5 },
-     "Universe": { effect: "UFO" },
-     "Lion": { effect: "Smite" },
+   const GIFT_KEY_MAP = {
+     "Rose": "P",
+     "Perfume": "J",
+     "GG": "F",
    };
    ```
 
-   Efek yang valid: `Jail`, `Unjail`, `Freeze`, `Unfreeze`, `Flatten`,
-   `Explode`, `PushLeft`, `PushRight`, `Respawn`, `Smite`, `Rocket`,
-   `Pipe`, `Brazilian`, `UnBrazil`, `NailongPunch`, `UFO`, `Flip`.
+   Nama tombolnya ("P", "J", "F", "ONE", "SPACE", dst) harus sama
+   persis dengan yang kamu ketik di kolom **ShortCut** pas nyimpen
+   keybind di StreamerPanel **di dalam game**. Efek apa yang jalan dan
+   berapa lama durasinya itu 100% ikut keybind yang kamu atur sendiri
+   di situ — bukan dikonfigurasi di sini lagi. Kalau kamu ganti isi
+   tombol P di in-game dari Jail ke Freeze, gift Rose otomatis ikut
+   berubah tanpa perlu ubah kode ini.
 
 ---
 
@@ -95,7 +97,7 @@ https://NAMA-PROJECT-LO.up.railway.app/roblox/health
 
 Kalau berhasil, muncul sesuatu kayak:
 ```json
-{"ok":true,"queued":0,"mappedGifts":["Rose","Perfume","GG","Universe","Lion","Galaxy","TikTok"]}
+{"ok":true,"queued":0,"mappedGifts":["Rose"]}
 ```
 
 Kalau muncul error 500 soal `ROBLOX_BRIDGE_KEY belum di-set`, berarti
@@ -110,7 +112,10 @@ Bagian 3 belum tersimpan / belum ke-deploy ulang.
 3. Buka script server `StreamerPro Server Handler` (yang isinya fungsi
    `runEffect`, `onPlayerAdded`, dll).
 4. Tempel isi file `roblox-tiktok-polling.lua` di bagian paling bawah
-   script itu.
+   script itu. (Kalau sebelumnya sudah pernah pasang versi lama, ganti
+   seluruh bagian "TIKTOK LIVE BRIDGE" yang lama dengan isi file baru
+   ini — versi baru pakai `simulateKeyPress()`, bukan `runEffect()`
+   langsung.)
 5. Ganti 3 baris ini di paling atas snippet:
    ```lua
    local TIKTOK_BRIDGE_URL = "https://NAMA-PROJECT-LO.up.railway.app/roblox/events"
@@ -125,14 +130,23 @@ Bagian 3 belum tersimpan / belum ke-deploy ulang.
 
 1. Buka `control.html` panel lo, connect ke akun TikTok yang mau di-tes
    (harus lagi LIVE).
-2. Minta orang lain (atau kirim sendiri kalau bisa) gift yang ada di
-   `GIFT_EFFECT_MAP`, misalnya "Rose".
-3. Dalam 1-3 detik, di Output/Console Roblox Studio (kalau lagi test di
+2. Di dalam game, pastikan `STREAM_TARGET_USERNAME` sudah simpan
+   keybind buat tombol yang ada di `GIFT_KEY_MAP` (misal tombol "P")
+   lewat StreamerPanel — coba dulu manual pencet tombolnya, pastikan
+   efeknya beneran jalan.
+3. Minta orang lain (atau kirim sendiri kalau bisa) gift yang ada di
+   `GIFT_KEY_MAP`, misalnya "Rose".
+4. Dalam 1-3 detik, di Output/Console Roblox Studio (kalau lagi test di
    Studio) akan muncul log:
    ```
-   [TikTokBridge] Gift 'Rose' x1 dari username123 -> efek Jail
+   [TikTokBridge] Gift 'Rose' x1 dari username123 -> pencet tombol 'P'
    ```
-4. Karakter `STREAM_TARGET_USERNAME` akan langsung kena efek Jail.
+5. Efek yang tersimpan di keybind tombol "P" akan langsung jalan ke
+   `STREAM_TARGET_USERNAME`.
+
+Kalau muncul warning `belum punya keybind buat tombol 'P'`, berarti
+kamu belum nyimpen keybind tombol itu di StreamerPanel in-game — buka
+panelnya, atur efek + durasi buat tombol "P", baru gift bisa trigger.
 
 Kalau gak muncul apa-apa, cek urutan ini:
 - `/roblox/health` di browser bisa diakses? (Bagian 4)

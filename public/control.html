@@ -43,6 +43,7 @@
       <button data-tab="tts"><span class="nav-icon">◌</span><span>Text-to-Speech</span></button>
       <button data-tab="sound"><span class="nav-icon">◖</span><span>Soundboard</span></button>
       <button data-tab="music"><span class="nav-icon">♫</span><span>Music Request</span></button>
+      <button data-tab="ytauto"><span class="nav-icon">🎬</span><span>YouTube Player</span></button>
       <button data-tab="simulator"><span class="nav-icon">▷</span><span>Simulator</span></button>
     </nav>
     <div class="side-section-label side-bottom-label">SYSTEM</div>
@@ -479,6 +480,56 @@
       </div>
       <div id="musicQueueList" class="log" style="max-height:240px;margin-top:14px;"></div>
       <p class="hint">Catatan: kualitas video meminta mode <b>tiny/144p</b> bila YouTube menyediakan level tersebut. YouTube tetap dapat memilih kualitas adaptif sendiri. Untuk musik: biarkan audio berasal dari Chrome. Jangan mengaktifkan audio dari Browser Source OBS untuk musik.</p>
+    </div>
+  </section>
+
+  <!-- YOUTUBE PLAYER (AUTO, TANPA REQUEST) -->
+  <section class="panel" id="tab-ytauto">
+    <div class="panel" style="display:block">
+      <h2>🎬 YouTube Player (Auto, Tanpa Request)</h2>
+      <p class="hint">
+        Beda dari Music Request di atas: di sini kamu <b>pilih sendiri</b> playlist atau kata kunci
+        YouTube sekali, terus videonya <b>lanjut sendiri otomatis</b> ke video berikutnya — persis
+        kayak nonton YouTube biasa dan gak perlu request ulang-ulang. Cocok buat pengisi pas gak ada
+        yang request lagu di tab Music Request.
+      </p>
+      <p class="hint" style="color:#e8a33d;">
+        Catatan: <code>youtube.com</code> versi lengkap (yang ada kolom search) memang gak bisa
+        ditanam di halaman lain (diblokir YouTube sendiri). Jadi di sini pakai player YouTube resmi
+        yang bisa dikasih <b>link playlist</b> atau <b>kata kunci pencarian</b> — hasilnya sama,
+        tetap auto lanjut ke video berikutnya sendiri.
+      </p>
+      <div class="field" style="margin-top:16px;">
+        <label>PLAYLIST ATAU KATA KUNCI</label>
+        <div class="row" style="flex-wrap:wrap;gap:8px;">
+          <input id="ytAutoInput" type="text" placeholder="Tempel link playlist YouTube, ATAU ketik kata kunci mis. 'lofi hip hop radio'" style="flex:1;min-width:220px">
+          <button class="btn" onclick="playYoutubeAuto()">▶ Putar</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">
+          Contoh link playlist: <code>https://www.youtube.com/playlist?list=PLxxxxxxxx</code> (playlist
+          punya kamu sendiri di YouTube, atau playlist musik bebas royalti yang kamu suka).
+          Kalau cuma ketik kata kunci biasa (bukan link), sistem otomatis muter hasil pencarian itu
+          berurutan satu-satu.
+        </p>
+      </div>
+      <div class="row" style="margin-top:8px;align-items:center;gap:10px;flex-wrap:wrap;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
+          <input type="checkbox" id="ytAutoLoop" onchange="toggleYtAutoLoop()"> Ulangi playlist dari awal (loop)
+        </label>
+      </div>
+      <div class="field" style="margin-top:16px;">
+        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;">
+          <button class="btn" id="ytAutoActivateBtn" type="button" onclick="activateYtAuto()">▶ Aktifkan Audio Chrome (YouTube Player)</button>
+          <span id="ytAutoStatus" class="voice-status">Belum diaktifkan</span>
+        </div>
+        <div id="ytAutoPlayer" style="width:min(480px,100%);height:270px;background:#000;border-radius:12px;overflow:hidden;margin-top:12px;"></div>
+        <p class="hint">
+          Sama seperti Music Request: audio diambil OBS lewat <b>Application Audio Capture</b> dari
+          halaman Chrome ini, gak perlu buka tab YouTube terpisah. <b>Cuma satu pemutar yang aktif
+          dalam satu waktu</b> — kalau kamu mulai muter di sini, Music Request otomatis berhenti
+          (biar gak dobel suara), dan sebaliknya.
+        </p>
+      </div>
     </div>
   </section>
 
