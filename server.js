@@ -182,6 +182,21 @@ async function searchYouTube(query) {
 // kata kunci pencarian bisa diputar sebagai daftar video asli — soalnya
 // fitur bawaan IFrame API `listType:'search'` sudah lama dimatikan YouTube
 // dan selalu balikin error "An error occurred. Please try again later."
+// Judul-judul di hasil pencarian YouTube sering ada beberapa versi dari lagu
+// yang sama persis (Official Video / Lyrics / Audio / Cover) dengan title
+// yang nyaris identik. Kalau gak difilter, itu bikin playlist kerasa
+// "ngulang-ngulang lagu yang sama" walau sebenarnya videoId-nya beda-beda.
+// Fungsi ini menyamakan title jadi bentuk polos (tanpa tag [...]/(...) dan
+// tanda baca) buat dipakai sebagai kunci dedupe.
+function normalizeTitleKey(title) {
+  return String(title || "")
+    .toLowerCase()
+    .replace(/[\[(].*?[\])]/g, " ")
+    .replace(/\b(official|video|audio|lyrics?|lyric video|mv|m\/v|hd|hq|4k|visualizer)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 async function searchYouTubeMulti(query, limit = 10) {
   const https = require("https");
   const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
@@ -209,17 +224,28 @@ async function searchYouTubeMulti(query, limit = 10) {
   const data = JSON.parse(html.slice(jsonStart, end));
   const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
   const results = [];
+  const seenTitleKeys = new Set();
+  const seenVideoIds = new Set();
+  const rawLimit = limit * 4; // scan pool lebih besar dulu, baru difilter dedupe
+  let scanned = 0;
+  outer:
   for (const section of contents) {
     const items = section?.itemSectionRenderer?.contents || [];
     for (const item of items) {
       const v = item?.videoRenderer;
       if (!v?.videoId || !v?.title?.runs?.[0]?.text) continue;
+      scanned += 1;
+      if (seenVideoIds.has(v.videoId)) { if (scanned >= rawLimit) break outer; continue; }
       const title = v.title.runs.map(x => x.text).join("");
+      const titleKey = normalizeTitleKey(title);
+      if (titleKey && seenTitleKeys.has(titleKey)) { if (scanned >= rawLimit) break outer; continue; } // skip versi duplikat (official/lyrics/audio dll)
       const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
       const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
       const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+      seenVideoIds.add(v.videoId);
+      if (titleKey) seenTitleKeys.add(titleKey);
       results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
-      if (results.length >= limit) return results;
+      if (results.length >= limit || scanned >= rawLimit) break outer;
     }
   }
   if (!results.length) throw new Error("Video YouTube tidak ditemukan.");

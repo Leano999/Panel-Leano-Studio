@@ -711,6 +711,8 @@
       if(playlistId){
         ytAutoPlayer.loadPlaylist({listType:'playlist', list: playlistId});
         setYtAutoStatus('▶ Memutar playlist…');
+        const shuffleEl = document.getElementById('ytAutoShuffle');
+        setTimeout(()=>{ try{ ytAutoPlayer.setShuffle(!!(shuffleEl && shuffleEl.checked)); }catch(e){} }, 400);
       } else if(looksLikeUrl){
         const vid = extractVideoId(raw);
         if(vid){
@@ -737,7 +739,12 @@
             ytAutoPlayer.loadPlaylist({playlist: ids, index: 0});
             const loopEl = document.getElementById('ytAutoLoop');
             if(loopEl){ try{ ytAutoPlayer.setLoop(loopEl.checked); }catch(e){} }
-            setYtAutoStatus('▶ Memutar hasil pencarian: '+raw);
+            // Hasil pencarian urutannya selalu sama tiap kali (gak kayak YouTube
+            // beneran yang personalized) -- jadi diacak di sini pakai fitur
+            // shuffle bawaan YouTube player biar gak kerasa muter itu-itu aja.
+            const shuffleEl = document.getElementById('ytAutoShuffle');
+            setTimeout(()=>{ try{ ytAutoPlayer.setShuffle(!shuffleEl || shuffleEl.checked); }catch(e){} }, 400);
+            setYtAutoStatus('▶ Memutar hasil pencarian (diacak): '+raw);
           }catch(e){ setYtAutoStatus('❌ Gagal memutar hasil pencarian.'); }
         });
       }
@@ -756,6 +763,12 @@
     const on = document.getElementById('ytAutoLoop').checked;
     if(ytAutoPlayer && ytAutoApiReady){
       try{ ytAutoPlayer.setLoop(on); }catch(e){}
+    }
+  }
+  function toggleYtAutoShuffle(){
+    const on = document.getElementById('ytAutoShuffle').checked;
+    if(ytAutoPlayer && ytAutoApiReady){
+      try{ ytAutoPlayer.setShuffle(on); }catch(e){}
     }
   }
 
