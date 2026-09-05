@@ -47,8 +47,21 @@ function edgeVolume(volume) {
 }
 function cleanTtsText(value) {
   return String(value || "")
+    // hapus link
     .replace(/https?:\/\/\S+/gi, " link ")
     .replace(/www\.\S+/gi, " link ")
+
+    // 🔥 hapus emoji & simbol unicode
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+
+    // fallback tambahan (biar lebih bersih)
+    .replace(/[\u{1F600}-\u{1F6FF}]/gu, "") // emoticon
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, "") // symbol & pictograph
+    .replace(/[\u{1F900}-\u{1F9FF}]/gu, "") // tambahan emoji
+    .replace(/[\u{2600}-\u{26FF}]/gu, "")   // misc symbol
+    .replace(/[\u{2700}-\u{27BF}]/gu, "")   // dingbats
+
+    // rapihin teks
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 500);
