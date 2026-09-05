@@ -57,6 +57,32 @@ function timingSafeEqual(a, b) {
   }
 }
 
+// Fungsi umum: masukkan satu penekanan tombol ke antrian, apapun
+// sumbernya (gift default GIFT_KEY_MAP, atau Custom Action rule dari
+// panel kontrol). Roblox nanti yang polling & ambil antrian ini.
+function queueKey(key, meta = {}) {
+  if (!key) return false;
+
+  seq += 1;
+  queue.push({
+    id: seq,
+    key,
+    username: meta.username || "",
+    giftName: meta.giftName || "",
+    count: meta.count || 1,
+    ts: Date.now(),
+  });
+
+  if (queue.length > MAX_QUEUE) {
+    queue.shift(); // buang yang paling lama kalau kepenuhan
+  }
+
+  console.log(
+    `[roblox-bridge] Antri tombol "${key}"${meta.username ? ` (${meta.username})` : ""}`
+  );
+  return true;
+}
+
 // Dipanggil dari server.js setiap ada event masuk ke processEvent().
 // Kalau event itu gift dan namanya ada di GIFT_KEY_MAP, dimasukkan
 // ke antrian buat diambil Roblox nanti (isinya tombol yang mau
@@ -68,23 +94,11 @@ function maybeQueueEffectForGift(payload) {
   const key = GIFT_KEY_MAP[giftName];
   if (!key) return; // gift ini gak di-mapping, dilewati
 
-  seq += 1;
-  queue.push({
-    id: seq,
-    key,
+  queueKey(key, {
     username: payload.username || "",
     giftName,
     count: payload.count || 1,
-    ts: Date.now(),
   });
-
-  if (queue.length > MAX_QUEUE) {
-    queue.shift(); // buang yang paling lama kalau kepenuhan
-  }
-
-  console.log(
-    `[roblox-bridge] Antri tombol "${key}" dari gift "${giftName}" (${payload.username || "?"})`
-  );
 }
 
 // Daftarkan route Express /roblox/events. Panggil ini dari server.js
@@ -120,4 +134,4 @@ function registerRobloxRoutes(app) {
   });
 }
 
-module.exports = { maybeQueueEffectForGift, registerRobloxRoutes, GIFT_KEY_MAP };
+module.exports = { maybeQueueEffectForGift, registerRobloxRoutes, queueKey, GIFT_KEY_MAP };

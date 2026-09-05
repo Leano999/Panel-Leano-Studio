@@ -392,9 +392,19 @@
   // ---- Custom actions ----
   let actionRules = [];
   function addAction(){
-    actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!' });
+    actionRules.push({id: Math.random().toString(36).slice(2,9), enabled:true, event:'comment', keyword:'', action:'tts', value:'Terima kasih {username}!', image:'' });
     renderActions();
   }
+  // Placeholder & label field "value" berubah tergantung jenis aksi,
+  // biar jelas apa yang harus diisi.
+  const ACTION_VALUE_HINT = {
+    tts: 'teks TTS, boleh pakai {username}/{comment}/{gift}',
+    alert: 'jenis alert (mis. gift, follow)',
+    sound: 'sound id (lihat Soundboard)',
+    keystroke: 'nama tombol Roblox, mis. P, SPACE, ONE',
+    message: 'teks pesan overlay, boleh pakai {username}/{comment}/{gift}',
+    webhook: 'https://... (GET request, boleh pakai {username}/{comment}/{gift})',
+  };
   function renderActions(){
     const root = document.getElementById('actionList');
     root.innerHTML = '';
@@ -406,6 +416,7 @@
       const wrap = document.createElement('div');
       wrap.className = 'field';
       wrap.style.marginTop = '12px';
+      const isMessage = a.action === 'message';
       wrap.innerHTML = `
         <div class="row" style="gap:8px;flex-wrap:wrap;">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;"><input type="checkbox" data-i="${i}" data-k="enabled" ${a.enabled?'checked':''}> ON</label>
@@ -416,12 +427,16 @@
             <option value="gift" ${a.event==='gift'?'selected':''}>Gift</option>
           </select>
           <input data-i="${i}" data-k="keyword" value="${escapeHtml(a.keyword)}" placeholder="keyword (kosong = semua)" style="flex:1;min-width:150px;">
-          <select data-i="${i}" data-k="action" style="width:120px;">
+          <select data-i="${i}" data-k="action" style="width:130px;">
             <option value="tts" ${a.action==='tts'?'selected':''}>TTS</option>
             <option value="alert" ${a.action==='alert'?'selected':''}>Alert</option>
             <option value="sound" ${a.action==='sound'?'selected':''}>Sound</option>
+            <option value="keystroke" ${a.action==='keystroke'?'selected':''}>Keystroke Roblox</option>
+            <option value="message" ${a.action==='message'?'selected':''}>Pesan Overlay</option>
+            <option value="webhook" ${a.action==='webhook'?'selected':''}>Webhook</option>
           </select>
-          <input data-i="${i}" data-k="value" value="${escapeHtml(a.value)}" placeholder="aksi / teks / sound id" style="flex:2;min-width:200px;">
+          <input data-i="${i}" data-k="value" value="${escapeHtml(a.value)}" placeholder="${ACTION_VALUE_HINT[a.action] || 'nilai aksi'}" style="flex:2;min-width:220px;">
+          ${isMessage ? `<input data-i="${i}" data-k="image" value="${escapeHtml(a.image||'')}" placeholder="URL foto (opsional)" style="flex:2;min-width:220px;">` : ''}
           <button class="btn" data-remove="${i}">Hapus</button>
         </div>`;
       root.appendChild(wrap);
@@ -429,6 +444,10 @@
     root.querySelectorAll('[data-i][data-k]').forEach(el => el.addEventListener('input', () => {
       const i = Number(el.dataset.i), k = el.dataset.k;
       actionRules[i][k] = el.type === 'checkbox' ? el.checked : el.value;
+    }));
+    root.querySelectorAll('select[data-k="action"]').forEach(el => el.addEventListener('change', () => {
+      // re-render biar field "URL foto" muncul/hilang & placeholder ganti sesuai jenis aksi baru
+      renderActions();
     }));
     root.querySelectorAll('[data-remove]').forEach(el => el.addEventListener('click', () => {
       actionRules.splice(Number(el.dataset.remove), 1); renderActions();
@@ -780,7 +799,7 @@
   // ---- Simulator ----
   function simulateTtsComment(){const username=document.getElementById('simUsername').value||'PenontonDemo';const comment=document.getElementById('simComment').value||'halo, tes TTS!';socket.emit('trigger',{kind:'alert',type:'comment',username,extra:comment});logEvent('Tes Chat + TTS dikirim ke Browser Source ALERT + TTS. Pastikan audio Browser Source tidak di-mute.');}
   function cp(id){navigator.clipboard?.writeText(document.getElementById(id).textContent);logEvent('URL Browser Source disalin.');}
-  const baseUrl=location.origin;setTimeout(()=>{document.getElementById('srcChat').textContent=baseUrl+'/overlay-comments.html?v=27';document.getElementById('srcFollowGift').textContent=baseUrl+'/overlay-follow-gift.html?v=27';document.getElementById('srcGoal').textContent=baseUrl+'/overlay-goal.html?v=27';document.getElementById('srcAlert').textContent=baseUrl+'/overlay.html?v=27';document.getElementById('srcTts').textContent=baseUrl+'/overlay-tts.html?v=27';document.getElementById('musicUrl').textContent=baseUrl+'/overlay-music.html?v=32';
+  const baseUrl=location.origin;setTimeout(()=>{document.getElementById('srcChat').textContent=baseUrl+'/overlay-comments.html?v=27';document.getElementById('srcFollowGift').textContent=baseUrl+'/overlay-follow-gift.html?v=27';document.getElementById('srcGoal').textContent=baseUrl+'/overlay-goal.html?v=27';document.getElementById('srcAlert').textContent=baseUrl+'/overlay.html?v=27';document.getElementById('srcTts').textContent=baseUrl+'/overlay-tts.html?v=27';document.getElementById('srcMessage').textContent=baseUrl+'/overlay-message.html?v=1';document.getElementById('musicUrl').textContent=baseUrl+'/overlay-music.html?v=32';
     if(document.getElementById('musicPlayerUrl')) document.getElementById('musicPlayerUrl').textContent=baseUrl+'/music-player.html?v=32';},0);
 
   function simulateEvent(type){

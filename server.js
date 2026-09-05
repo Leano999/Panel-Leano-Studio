@@ -7,7 +7,7 @@ const crypto = require("crypto");
 const { Server } = require("socket.io");
 const https = require("https");
 const { setupTiktok } = require("./tiktok");
-const { maybeQueueEffectForGift, registerRobloxRoutes } = require("./roblox-bridge");
+const { maybeQueueEffectForGift, registerRobloxRoutes, queueKey } = require("./roblox-bridge");
 
 const app = express();
 const server = http.createServer(app);
@@ -685,14 +685,23 @@ io.on("connection", (socket) => {
 });
 
 
+const ACTION_TYPES = ["tts", "alert", "sound", "keystroke", "message", "webhook"];
+
 function normalizeAction(a = {}) {
   return {
     id: String(a.id || Math.random().toString(36).slice(2, 9)),
     enabled: a.enabled !== false,
     event: ["comment", "like", "follow", "gift"].includes(a.event) ? a.event : "comment",
     keyword: String(a.keyword || "").slice(0, 80),
-    action: ["tts", "alert", "sound"].includes(a.action) ? a.action : "tts",
-    value: String(a.value || "").slice(0, 200),
+    action: ACTION_TYPES.includes(a.action) ? a.action : "tts",
+    // Arti "value" tergantung jenis aksinya:
+    //   tts/alert/sound -> sama seperti sebelumnya
+    //   keystroke       -> nama tombol Roblox, mis. "P", "SPACE", "ONE"
+    //   message         -> teks pesan yang muncul di overlay
+    //   webhook         -> URL tujuan (GET request)
+    value: String(a.value || "").slice(0, 300),
+    // Cuma dipakai kalau action === "message": URL gambar/foto opsional.
+    image: String(a.image || "").slice(0, 500),
   };
 }
 
@@ -726,8 +735,48 @@ function runCustomActions(payload) {
       });
     } else if (action.action === "sound") {
       io.emit("event", { kind: "sound", id: action.value || "ding" });
+    } else if (action.action === "keystroke") {
+      // Kirim tombol ke antrian Roblox bridge, sama seperti GIFT_KEY_MAP
+      // tapi bisa diatur langsung dari panel, untuk event apapun (bukan
+      // cuma gift) dan dengan syarat keyword.
+      queueKey(String(action.value || "").trim().toUpperCase(), {
+        username: payload.username || "",
+        giftName: payload.giftName || (payload.type === "gift" ? (payload.extra || "") : ""),
+        count: payload.count || 1,
+      });
+    } else if (action.action === "message") {
+      // Pesan custom (teks + foto opsional) muncul di overlay-message.html
+      io.emit("event", {
+        kind: "message",
+        text: replaceVars(action.value),
+        image: action.image || "",
+      });
+    } else if (action.action === "webhook") {
+      fireWebhook(replaceVars(action.value));
     }
   }
+}
+
+// Trigger webhook lewat GET request. Sengaja dibuat "fire and forget":
+// gagal atau timeout gak boleh sampai crash / nge-block event lain.
+function fireWebhook(rawUrl) {
+  let url;
+  try {
+    url = new URL(String(rawUrl || "").trim());
+  } catch {
+    console.warn(`[webhook] URL tidak valid, dilewati: ${rawUrl}`);
+    return;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    console.warn(`[webhook] Protokol tidak didukung: ${url.protocol}`);
+    return;
+  }
+  const lib = url.protocol === "https:" ? https : http;
+  const req = lib.get(url, { timeout: 8000 }, (res) => {
+    res.resume(); // buang body, kita cuma peduli trigger-nya jalan
+  });
+  req.on("timeout", () => req.destroy(new Error("Webhook timeout")));
+  req.on("error", (err) => console.warn(`[webhook] Gagal: ${err.message}`));
 }
 
 function processEvent(payload = {}, meta = {}) {
