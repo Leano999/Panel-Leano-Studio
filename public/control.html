@@ -332,11 +332,27 @@
         <div class="field" style="margin:0;min-width:190px;flex:1;"><label>STYLE GIFT</label><select id="giftAnimStyle"><option value="treasure">Style 1 — Treasure</option><option value="rose">Style 2 — Rose</option><option value="universe">Style 3 — Universe</option></select></div>
       </div>
       <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
+        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>EFEK MASUK FOLLOW</label><select id="followAnimEffect">
+          <option value="fade">Fade Lembut</option>
+          <option value="bounce">Bounce Pop</option>
+          <option value="zoom">Zoom Pop</option>
+          <option value="slideRight">Slide dari Kanan</option>
+          <option value="flip">Flip 3D</option>
+        </select></div>
+        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>EFEK MASUK GIFT</label><select id="giftAnimEffect">
+          <option value="fade">Fade Lembut</option>
+          <option value="bounce">Bounce Pop</option>
+          <option value="zoom">Zoom Pop</option>
+          <option value="slideRight">Slide dari Kanan</option>
+          <option value="flip">Flip 3D</option>
+        </select></div>
+      </div>
+      <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
         <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI FOLLOW (DETIK)</label><input id="followAnimDuration" type="number" min="2" max="10" step="1" value="4"></div>
         <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI GIFT (DETIK)</label><input id="giftAnimDuration" type="number" min="2" max="10" step="1" value="5"></div>
         <div class="field" style="margin:0;min-width:190px;flex:1;"><label>POSISI</label><select id="animPosition"><option value="top-center">Atas Tengah</option><option value="center">Tengah</option><option value="bottom-center">Bawah Tengah</option></select></div>
       </div>
-      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveAnimationSettings()">Simpan Animasi</button><button class="btn" onclick="testAnimation('follow')">▶ Test Follow</button><button class="btn" onclick="testAnimation('gift')">▶ Test Gift</button><span class="hint" id="animStatus" style="margin:0;">Belum disimpan.</span></div>
+      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveAnimationSettings()">Simpan Animasi</button><button class="btn" onclick="testAnimation('follow')">▶ Test Follow</button><button class="btn" onclick="testAnimation('gift')">▶ Test Gift</button><button class="btn" onclick="testAnimationSpam('gift')">▶ Test Spam (5x)</button><span class="hint" id="animStatus" style="margin:0;">Belum disimpan.</span></div>
     </div>
 
     <div class="field" style="margin-top:18px;">

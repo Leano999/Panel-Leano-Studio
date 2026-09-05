@@ -461,11 +461,13 @@
   socket.on('actions:list', actions => { actionRules = Array.isArray(actions) ? actions : []; renderActions(); });
 
   // ---- Follow/Gift animation settings ----
-  let animationSettings = { enabled:true, followStyle:'wings', giftStyle:'treasure', followDuration:4, giftDuration:5, position:'top-center' };
+  let animationSettings = { enabled:true, followStyle:'wings', giftStyle:'treasure', followEffect:'fade', giftEffect:'bounce', followDuration:4, giftDuration:5, position:'top-center' };
   function renderAnimationSettings(){
     document.getElementById('animEnabled').checked = animationSettings.enabled !== false;
     document.getElementById('followAnimStyle').value = animationSettings.followStyle || 'wings';
     document.getElementById('giftAnimStyle').value = animationSettings.giftStyle || 'treasure';
+    document.getElementById('followAnimEffect').value = animationSettings.followEffect || 'fade';
+    document.getElementById('giftAnimEffect').value = animationSettings.giftEffect || 'bounce';
     document.getElementById('followAnimDuration').value = animationSettings.followDuration || 4;
     document.getElementById('giftAnimDuration').value = animationSettings.giftDuration || 5;
     document.getElementById('animPosition').value = animationSettings.position || 'top-center';
@@ -475,6 +477,8 @@
       enabled: document.getElementById('animEnabled').checked,
       followStyle: document.getElementById('followAnimStyle').value,
       giftStyle: document.getElementById('giftAnimStyle').value,
+      followEffect: document.getElementById('followAnimEffect').value,
+      giftEffect: document.getElementById('giftAnimEffect').value,
       followDuration: Math.max(2, Math.min(10, Number(document.getElementById('followAnimDuration').value)||4)),
       giftDuration: Math.max(2, Math.min(10, Number(document.getElementById('giftAnimDuration').value)||5)),
       position: document.getElementById('animPosition').value,
@@ -487,6 +491,19 @@
     const extra = type === 'gift' ? 'Rose x5' : 'Baru saja follow!';
     socket.emit('trigger', {kind:'alert', type, username, extra, count:1});
     logEvent(`Test animasi ${type}: @${username}`);
+  }
+  function testAnimationSpam(type){
+    // Kirim beberapa alert beruntun buat ngetes tumpukan notifikasi
+    // (biar keliatan susunannya vertikal, bukan geser ke samping lagi).
+    const base = document.getElementById('simUsername')?.value || 'user';
+    for (let n = 0; n < 5; n++) {
+      setTimeout(() => {
+        const username = `${base}${n+1}`;
+        const extra = type === 'gift' ? 'Rose x1' : 'Baru saja follow!';
+        socket.emit('trigger', {kind:'alert', type, username, extra, count:1});
+      }, n * 220);
+    }
+    logEvent(`Test spam animasi ${type} (5x beruntun)`);
   }
   socket.on('overlay:settings', settings => {
     animationSettings = { ...animationSettings, ...(settings?.animations || {}) };

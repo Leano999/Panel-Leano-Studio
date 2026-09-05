@@ -132,6 +132,8 @@ let overlaySettings = {
     enabled: true,
     followStyle: "wings",
     giftStyle: "treasure",
+    followEffect: "fade",
+    giftEffect: "bounce",
     followDuration: 4,
     giftDuration: 5,
     position: "top-center",
@@ -564,6 +566,7 @@ io.on("connection", (socket) => {
     const a = payload.animations || {};
     const allowedFollow = ["wings", "neon", "cat"];
     const allowedGift = ["treasure", "rose", "universe"];
+    const allowedEffects = ["fade", "bounce", "zoom", "slideRight", "flip"];
     const allowedPos = ["top-center", "center", "bottom-center"];
     const allowedChatStyles = ["glass-card", "pill", "speech", "stacked", "neon-line", "compact"];
     const chatPayload = payload.chat || {};
@@ -577,6 +580,8 @@ io.on("connection", (socket) => {
         enabled: a.enabled !== false,
         followStyle: allowedFollow.includes(a.followStyle) ? a.followStyle : (overlaySettings.animations?.followStyle || "wings"),
         giftStyle: allowedGift.includes(a.giftStyle) ? a.giftStyle : (overlaySettings.animations?.giftStyle || "treasure"),
+        followEffect: allowedEffects.includes(a.followEffect) ? a.followEffect : (overlaySettings.animations?.followEffect || "fade"),
+        giftEffect: allowedEffects.includes(a.giftEffect) ? a.giftEffect : (overlaySettings.animations?.giftEffect || "bounce"),
         followDuration: Math.min(10, Math.max(2, Number(a.followDuration) || overlaySettings.animations?.followDuration || 4)),
         giftDuration: Math.min(10, Math.max(2, Number(a.giftDuration) || overlaySettings.animations?.giftDuration || 5)),
         position: allowedPos.includes(a.position) ? a.position : (overlaySettings.animations?.position || "top-center"),
