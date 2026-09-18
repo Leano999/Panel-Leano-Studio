@@ -2,8 +2,12 @@ const express = require("express");
 const http = require("http");
 const path = require("path");
 const os = require("os");
+const fs = require("fs");
+const crypto = require("crypto");
 const { Server } = require("socket.io");
+const https = require("https");
 const { setupTiktok } = require("./tiktok");
+const { maybeQueueEffectForGift, registerRobloxRoutes, queueKey } = require("./roblox-bridge");
 
 const app = express();
 const server = http.createServer(app);
@@ -11,98 +15,111 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, "public")));
 
-const tiktok = setupTiktok(io, processEvent);
-
-// ---- Keypress-on-gift (v45) ----
-// Simulates a real keyboard press on THIS machine whenever a matching
-// gift/comment/like/follow event fires. This only makes sense when the
-// panel runs locally (START PANEL.bat) on the same PC as OBS/the game -
-// a cloud host like Railway has no keyboard/desktop session to press keys
-// into, so this feature silently no-ops there.
-let nutKeyboard = null;
-let NutKey = null;
+// Natural TTS via Microsoft Edge online TTS (no Azure API key required).
+// The voice is intentionally fixed to Indonesian female neural speech.
+const EDGE_TTS_VOICE = "id-ID-GadisNeural";
+const TTS_CACHE_DIR = path.join(os.tmpdir(), "leano-stream-panel-tts");
+fs.mkdirSync(TTS_CACHE_DIR, { recursive: true });
+let EdgeTTS = null;
 try {
-  const nut = require("@nut-tree-fork/nut-js");
-  nutKeyboard = nut.keyboard;
-  NutKey = nut.Key;
-  nutKeyboard.config.autoDelayMs = 0;
-  console.log("[keypress] Simulasi keyboard aktif (nut-js siap).");
-} catch (err) {
-  console.warn(
-    "[keypress] @nut-tree-fork/nut-js tidak ditemukan/tidak bisa dimuat - fitur " +
-    "'Keypress' di Custom Action Events tidak akan menekan tombol apa pun. " +
-    "Jalankan npm install lagi lalu restart panel untuk mengaktifkannya. " +
-    "(Fitur ini memang hanya berfungsi saat panel dijalankan lokal, bukan di Railway.)"
-  );
+  ({ EdgeTTS } = require("node-edge-tts"));
+} catch (_) {
+  // Dependency is installed automatically by START PANEL.bat / npm install.
 }
 
-// Map dari nama tombol yang diketik user (bebas huruf besar/kecil) ke Key nut-js.
-const KEY_NAME_MAP = (() => {
-  if (!NutKey) return {};
-  const map = {};
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((ch) => { map[ch] = NutKey[ch]; });
-  "0123456789".split("").forEach((d) => { map[d] = NutKey[`Num${d}`]; });
-  for (let i = 1; i <= 12; i++) map[`F${i}`] = NutKey[`F${i}`];
-  Object.assign(map, {
-    SPACE: NutKey.Space,
-    SPACEBAR: NutKey.Space,
-    ENTER: NutKey.Enter,
-    RETURN: NutKey.Enter,
-    TAB: NutKey.Tab,
-    ESC: NutKey.Escape,
-    ESCAPE: NutKey.Escape,
-    UP: NutKey.Up,
-    DOWN: NutKey.Down,
-    LEFT: NutKey.Left,
-    RIGHT: NutKey.Right,
-    SHIFT: NutKey.LeftShift,
-    CTRL: NutKey.LeftControl,
-    CONTROL: NutKey.LeftControl,
-    ALT: NutKey.LeftAlt,
-  });
-  return map;
-})();
+function pctRate(rate) {
+  const n = Number(rate);
+  const r = Number.isFinite(n) ? Math.max(0.65, Math.min(1.35, n)) : 0.95;
+  const pct = Math.round((r - 1) * 100);
+  return (pct >= 0 ? "+" : "") + pct + "%";
+}
+function edgePitch(pitch) {
+  const n = Number(pitch);
+  const p = Number.isFinite(n) ? Math.max(0.5, Math.min(1.5, n)) : 1;
+  const hz = Math.round((p - 1) * 50);
+  return (hz >= 0 ? "+" : "") + hz + "Hz";
+}
+function edgeVolume(volume) {
+  const n = Number(volume);
+  const v = Number.isFinite(n) ? Math.max(0, Math.min(1, n)) : 1;
+  const pct = Math.round((v - 1) * 100);
+  return (pct >= 0 ? "+" : "") + pct + "%";
+}
+function cleanTtsText(value) {
+  return String(value || "")
+    // hapus link
+    .replace(/https?:\/\/\S+/gi, " link ")
+    .replace(/www\.\S+/gi, " link ")
 
-function resolveKey(name) {
-  const key = String(name || "").trim().toUpperCase();
-  return Object.prototype.hasOwnProperty.call(KEY_NAME_MAP, key) ? KEY_NAME_MAP[key] : null;
+    // 🔥 hapus emoji & simbol unicode
+    .replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, "")
+
+    // fallback tambahan (biar lebih bersih)
+    .replace(/[\u{1F600}-\u{1F6FF}]/gu, "") // emoticon
+    .replace(/[\u{1F300}-\u{1F5FF}]/gu, "") // symbol & pictograph
+    .replace(/[\u{1F900}-\u{1F9FF}]/gu, "") // tambahan emoji
+    .replace(/[\u{2600}-\u{26FF}]/gu, "")   // misc symbol
+    .replace(/[\u{2700}-\u{27BF}]/gu, "")   // dingbats
+
+    // rapihin teks
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+}
+function ttsCacheFile(text, rate, pitch, volume) {
+  const key = crypto.createHash("sha256")
+    .update(JSON.stringify([EDGE_TTS_VOICE, text, rate, pitch, volume]))
+    .digest("hex");
+  return path.join(TTS_CACHE_DIR, key + ".mp3");
 }
 
-// Tracks currently-held keys so an in-flight "hold" can be released early
-// if the same key is triggered again (avoids a stuck key on rapid gifts).
-const heldKeyTimers = new Map();
-
-async function simulateKeypress(keyName, holdMs = 0) {
-  if (!nutKeyboard) return; // library not available (e.g. running on Railway)
-  const key = resolveKey(keyName);
-  if (key === null) {
-    console.warn(`[keypress] Tombol "${keyName}" tidak dikenali, dilewati.`);
-    return;
+app.post("/api/tts", express.text({ type: ["text/plain", "application/json"] }), async (req, res) => {
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch (_) { body = { text: body }; }
   }
-  const duration = Math.min(10000, Math.max(0, Number(holdMs) || 0));
-
-  // If this exact key is already being held from a previous trigger, clear
-  // that timer first so we don't release it too early/late.
-  if (heldKeyTimers.has(key)) {
-    clearTimeout(heldKeyTimers.get(key));
-    heldKeyTimers.delete(key);
+  body = body || {};
+  const text = cleanTtsText(body.text);
+  if (!text) return res.status(400).json({ ok:false, error:"Teks kosong." });
+  if (!EdgeTTS) {
+    return res.status(503).json({
+      ok:false,
+      error:"Modul TTS natural belum terpasang. Tutup panel lalu jalankan START PANEL.bat lagi, atau jalankan: npm install"
+    });
   }
+
+  const rate = Number(body.rate) || 0.95;
+  const pitch = Number(body.pitch) || 1;
+  const volume = Number.isFinite(Number(body.volume)) ? Number(body.volume) : 1;
+  const outFile = ttsCacheFile(text, rate, pitch, volume);
 
   try {
-    await nutKeyboard.pressKey(key);
-    if (duration <= 0) {
-      await nutKeyboard.releaseKey(key);
-    } else {
-      const timer = setTimeout(async () => {
-        heldKeyTimers.delete(key);
-        try { await nutKeyboard.releaseKey(key); } catch (err) { /* ignore */ }
-      }, duration);
-      heldKeyTimers.set(key, timer);
+    if (!fs.existsSync(outFile) || fs.statSync(outFile).size < 1000) {
+      const tts = new EdgeTTS({
+        voice: EDGE_TTS_VOICE,
+        lang: "id-ID",
+        outputFormat: "audio-24khz-96kbitrate-mono-mp3",
+        rate: pctRate(rate),
+        pitch: edgePitch(pitch),
+        volume: edgeVolume(volume),
+        timeout: 15000,
+      });
+      await tts.ttsPromise(text, outFile);
     }
+    res.status(200)
+      .set("Content-Type", "audio/mpeg")
+      .set("Cache-Control", "no-store")
+      .sendFile(outFile);
   } catch (err) {
-    console.warn(`[keypress] Gagal menekan tombol "${keyName}":`, err.message);
+    try { if (fs.existsSync(outFile)) fs.unlinkSync(outFile); } catch (_) {}
+    console.error("[TTS]", err);
+    res.status(502).json({ ok:false, error:`TTS natural gagal: ${err.message || err}` });
   }
-}
+});
+
+registerRobloxRoutes(app);
+
+const tiktok = setupTiktok(io, processEvent);
 
 // TTS auto-read settings, in-memory (resets on server restart).
 // readComments/readLikes control whether the overlay speaks incoming
@@ -114,8 +131,9 @@ let ttsSettings = {
   // Follow/Gift use custom SFX by default, not TTS.
   readFollows: false,
   readGifts: false,
-  voiceName: "",
-  rate: 1,
+  voiceName: "id-ID-GadisNeural",
+  voicePreset: "indofinity-natural",
+  rate: 0.95,
   pitch: 1,
   volume: 1,
 };
@@ -127,6 +145,8 @@ let overlaySettings = {
     enabled: true,
     followStyle: "wings",
     giftStyle: "treasure",
+    followEffect: "fade",
+    giftEffect: "bounce",
     followDuration: 4,
     giftDuration: 5,
     position: "top-center",
@@ -167,6 +187,51 @@ let musicCurrent = null;
 let musicRequestCooldown = new Map();
 let musicSearchBusy = false;
 let musicSettings = { volume: 0.75 };
+
+// ------------------------------------------------------------
+// FALLBACK PLAYLIST ("Auto DJ") — daftar lagu yang streamer siapkan
+// sekali, lalu otomatis diputar bergiliran SETIAP KALI antrian
+// request dari penonton kosong. Streamer gak perlu buka panel
+// berulang-ulang buat isi request sendiri.
+// ------------------------------------------------------------
+let fallbackPlaylist = []; // array of query strings, in-memory (reset kalau server restart)
+let fallbackCursor = 0;
+let fallbackEnabled = true;
+let fallbackBusy = false;
+const FALLBACK_MAX = 30;
+
+function fallbackState() {
+  return { items: fallbackPlaylist, enabled: fallbackEnabled };
+}
+function broadcastFallback() { io.emit("music:fallback:update", fallbackState()); }
+
+// Coba mainkan lagu berikutnya dari fallbackPlaylist (round-robin).
+// Kalau satu lagu gagal dicari (mis. video ditarik/error), otomatis
+// coba lagu berikutnya di daftar, sampai maksimal sepanjang daftar itu
+// sendiri (biar gak infinite loop kalau semuanya gagal).
+async function playNextFallbackSong() {
+  if (fallbackBusy || !fallbackPlaylist.length || musicCurrent) return;
+  fallbackBusy = true;
+  try {
+    let attempts = 0;
+    while (attempts < fallbackPlaylist.length) {
+      const query = fallbackPlaylist[fallbackCursor % fallbackPlaylist.length];
+      fallbackCursor = (fallbackCursor + 1) % fallbackPlaylist.length;
+      attempts += 1;
+      try {
+        const found = await searchYouTube(query);
+        musicCurrent = { ...found, requestedBy: "Auto DJ", query, id: `${found.videoId}-${Date.now()}` };
+        broadcastMusic();
+        return;
+      } catch (err) {
+        console.warn("[fallback] gagal cari lagu:", query, err?.message || err);
+        // lanjut coba lagu berikutnya di playlist
+      }
+    }
+  } finally {
+    fallbackBusy = false;
+  }
+}
 
 function musicState() {
   return {
@@ -221,6 +286,156 @@ async function searchYouTube(query) {
   throw new Error("Video YouTube tidak ditemukan.");
 }
 
+// Sama seperti searchYouTube(), tapi mengumpulkan beberapa hasil sekaligus
+// (bukan cuma hasil pertama). Dipakai oleh "YouTube Player (Auto)" supaya
+// kata kunci pencarian bisa diputar sebagai daftar video asli — soalnya
+// fitur bawaan IFrame API `listType:'search'` sudah lama dimatikan YouTube
+// dan selalu balikin error "An error occurred. Please try again later."
+// Judul-judul di hasil pencarian YouTube sering ada beberapa versi dari lagu
+// yang sama persis (Official Video / Lyrics / Audio / Cover) dengan title
+// yang nyaris identik. Kalau gak difilter, itu bikin playlist kerasa
+// "ngulang-ngulang lagu yang sama" walau sebenarnya videoId-nya beda-beda.
+// Fungsi ini menyamakan title jadi bentuk polos (tanpa tag [...]/(...) dan
+// tanda baca) buat dipakai sebagai kunci dedupe.
+// Judul di hasil pencarian YouTube sering ada BANYAK versi dari lagu yang
+// sama persis (official audio, lyric video, cover, slowed+reverb, nightcore,
+// radio edit, dll) yang TIDAK identik teksnya, tapi kalau kata "pengisi"-nya
+// dibuang, sisa kata intinya (nama lagu + artis) sama. Makanya perbandingan
+// di sini pakai kemiripan kata inti (token overlap), bukan kesamaan teks
+// persis -- biar gak kejadian lagi kasus playlist isinya "Losing Us" doang
+// diulang-ulang walau videoId-nya beda-beda tiap kali.
+const TITLE_FILLER_WORDS = new Set([
+  "official","video","audio","lyrics","lyric","mv","hd","hq","4k","visualizer",
+  "cover","remix","slowed","reverb","sped","nightcore","karaoke","instrumental",
+  "acoustic","live","extended","clean","explicit","radio","edit","version","ver",
+  "ft","feat","featuring","with","the","a","an","of","and","x","prod","by",
+  "lofi","dance","choreography","full","song","tiktok","viral","music","videos",
+  "8d","bass","boosted","hour","loop","trap","type","beat","reaction","performance",
+  "original","new","hits","1080p","720p"
+]);
+function titleTokens(title) {
+  let t = String(title || "").toLowerCase();
+  t = t.replace(/[\[(].*?[\])]/g, " ");
+  t = t.replace(/[^a-z0-9\s]/g, " ");
+  return new Set(t.split(/\s+/).filter(w => w && w.length > 1 && !TITLE_FILLER_WORDS.has(w)));
+}
+function isSimilarTitle(tokensA, existingTokenSets) {
+  for (const tokensB of existingTokenSets) {
+    const inter = [...tokensA].filter(w => tokensB.has(w)).length;
+    const union = new Set([...tokensA, ...tokensB]).size;
+    if (union > 0 && inter / union >= 0.5) return true;
+  }
+  return false;
+}
+
+async function searchYouTubeMulti(query, limit = 10) {
+  const https = require("https");
+  const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+  const html = await new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }, res => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", c => data += c);
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.setTimeout(12000, () => { req.destroy(new Error("YouTube search timeout")); });
+  });
+  const marker = "var ytInitialData = ";
+  const start = html.indexOf(marker);
+  if (start < 0) throw new Error("YouTube search tidak tersedia.");
+  const jsonStart = start + marker.length;
+  const end = html.indexOf(";</script>", jsonStart);
+  if (end < 0) throw new Error("Hasil YouTube tidak bisa dibaca.");
+  const data = JSON.parse(html.slice(jsonStart, end));
+  const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+  const results = [];
+  const seenVideoIds = new Set();
+  const keptTokenSets = [];
+  const rawLimit = limit * 6; // pool lebih besar, karena banyak yang bakal kesaring dedupe kemiripan
+  let scanned = 0;
+  outer:
+  for (const section of contents) {
+    const items = section?.itemSectionRenderer?.contents || [];
+    for (const item of items) {
+      const v = item?.videoRenderer;
+      if (!v?.videoId || !v?.title?.runs?.[0]?.text) continue;
+      scanned += 1;
+      if (seenVideoIds.has(v.videoId)) { if (scanned >= rawLimit) break outer; continue; }
+      const title = v.title.runs.map(x => x.text).join("");
+      const tokens = titleTokens(title);
+      if (tokens.size && isSimilarTitle(tokens, keptTokenSets)) { if (scanned >= rawLimit) break outer; continue; }
+      const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
+      const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
+      const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+      seenVideoIds.add(v.videoId);
+      if (tokens.size) keptTokenSets.push(tokens);
+      results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
+      if (results.length >= limit || scanned >= rawLimit) break outer;
+    }
+  }
+  if (!results.length) throw new Error("Video YouTube tidak ditemukan.");
+  return results;
+}
+
+// Khusus buat fallback kalau video pertama gagal diputar (kena restriksi
+// embed / region-lock / dll) -- BEDA dari searchYouTubeMulti yang sengaja
+// menyaring versi mirip untuk shuffle genre. Di sini kita justru MAU
+// beberapa upload lain dari lagu yang sama (official/lyric/cover dari
+// channel berbeda) sebagai cadangan, biar kalau upload pertama dikunci
+// embed-nya, player bisa otomatis coba upload lain tanpa nge-skip lagu.
+async function searchYouTubeCandidates(query, limit = 5) {
+  const https = require("https");
+  const url = "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+  const html = await new Promise((resolve, reject) => {
+    const req = https.get(url, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36",
+        "Accept-Language": "en-US,en;q=0.9"
+      }
+    }, res => {
+      let data = "";
+      res.setEncoding("utf8");
+      res.on("data", c => data += c);
+      res.on("end", () => resolve(data));
+    });
+    req.on("error", reject);
+    req.setTimeout(12000, () => { req.destroy(new Error("YouTube search timeout")); });
+  });
+  const marker = "var ytInitialData = ";
+  const start = html.indexOf(marker);
+  if (start < 0) throw new Error("YouTube search tidak tersedia.");
+  const jsonStart = start + marker.length;
+  const end = html.indexOf(";</script>", jsonStart);
+  if (end < 0) throw new Error("Hasil YouTube tidak bisa dibaca.");
+  const data = JSON.parse(html.slice(jsonStart, end));
+  const contents = data?.contents?.twoColumnSearchResultsRenderer?.primaryContents?.sectionListRenderer?.contents || [];
+  const results = [];
+  const seen = new Set();
+  for (const section of contents) {
+    const items = section?.itemSectionRenderer?.contents || [];
+    for (const item of items) {
+      const v = item?.videoRenderer;
+      if (!v?.videoId || !v?.title?.runs?.[0]?.text) continue;
+      if (seen.has(v.videoId)) continue;
+      seen.add(v.videoId);
+      const title = v.title.runs.map(x => x.text).join("");
+      const channel = v.ownerText?.runs?.[0]?.text || "YouTube";
+      const duration = v.lengthText?.simpleText || v.lengthText?.runs?.map(x => x.text).join("") || "";
+      const thumbnail = `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`;
+      results.push({ videoId: v.videoId, title, channel, duration, thumbnail });
+      if (results.length >= limit) return results;
+    }
+  }
+  if (!results.length) throw new Error("Video YouTube tidak ditemukan.");
+  return results;
+}
+
 async function addMusicRequest(username, query) {
   const clean = String(query || "").trim().slice(0, 160);
   if (!clean) return { ok:false, message:"Judul lagu kosong." };
@@ -234,10 +449,17 @@ async function addMusicRequest(username, query) {
   if (musicSearchBusy) return { ok:false, message:"Bot sedang mencari request lain, coba lagi sebentar." };
   musicSearchBusy = true;
   try {
-    const found = await searchYouTube(clean);
-    const item = { ...found, requestedBy: String(username || "Penonton"), query: clean, id: `${found.videoId}-${Date.now()}` };
+    const candidates = await searchYouTubeCandidates(clean, 5);
+    const [found, ...altCandidates] = candidates;
+    // altCandidates disertakan ke client: kalau video utama gagal diputar
+    // (mis. embed dikunci pemiliknya), player otomatis coba upload lain
+    // dari lagu yang sama, bukan langsung nge-skip request ini.
+    const item = { ...found, altCandidates, requestedBy: String(username || "Penonton"), query: clean, id: `${found.videoId}-${Date.now()}` };
     musicRequestCooldown.set(key, now + MUSIC_COOLDOWN_MS);
-    if (!musicCurrent) {
+    // Request beneran dari penonton diprioritaskan di atas Auto DJ —
+    // kalau yang lagi main sekarang cuma lagu isian dari fallback
+    // playlist, langsung ganti ke lagu yang direquest ini.
+    if (!musicCurrent || musicCurrent.requestedBy === "Auto DJ") {
       musicCurrent = item;
     } else {
       musicQueue.push(item);
@@ -254,6 +476,9 @@ async function addMusicRequest(username, query) {
 function musicNext() {
   musicCurrent = musicQueue.shift() || null;
   broadcastMusic();
+  if (!musicCurrent && fallbackEnabled && fallbackPlaylist.length) {
+    playNextFallbackSong();
+  }
 }
 
 // Likes can arrive very rapidly (real TikTok likes or the leaderboard
@@ -273,25 +498,6 @@ function scheduleLiveStateBroadcast() {
     io.emit("stats:update", streamStats);
     io.emit("goal:update", goalSettings);
   }, 250);
-}
-
-// Auto-learned gift catalog: instead of guessing gift names/coin prices
-// (TikTok has no public "list all gifts" API and prices change), we just
-// remember every real gift name + coin cost that actually arrives from
-// TikTok during a live session. This is guaranteed accurate because it's
-// the exact data TikTok itself sent - no guesswork. Resets on server
-// restart, same as the other in-memory settings in this file.
-let discoveredGifts = new Map(); // giftName (lowercase) -> { name, coins }
-
-function rememberGift(giftName, coinsPerUnit) {
-  const name = String(giftName || "").trim();
-  if (!name) return;
-  const key = name.toLowerCase();
-  const coins = Math.max(0, Number(coinsPerUnit) || 0);
-  const existing = discoveredGifts.get(key);
-  if (existing && existing.coins === coins) return; // no change, skip broadcast
-  discoveredGifts.set(key, { name, coins });
-  io.emit("gifts:known", [...discoveredGifts.values()]);
 }
 
 let customActions = [
@@ -322,7 +528,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("actions:get", () => socket.emit("actions:list", customActions));
-  socket.emit("gifts:known", [...discoveredGifts.values()]);
   socket.on("actions:save", (actions = []) => {
     customActions = Array.isArray(actions) ? actions.slice(0, 50).map(normalizeAction) : [];
     io.emit("actions:list", customActions);
@@ -360,9 +565,10 @@ io.on("connection", (socket) => {
       readLikes: !!payload.readLikes,
       readFollows: payload.readFollows === true,
       readGifts: payload.readGifts === true,
-      voiceName: typeof payload.voiceName === "string" ? payload.voiceName : "",
-      rate: Math.min(2, Math.max(0.5, Number(payload.rate) || 1)),
-      pitch: Math.min(2, Math.max(0, Number(payload.pitch) || 1)),
+      voiceName: "id-ID-GadisNeural",
+      voicePreset: "indofinity-natural",
+      rate: Math.min(1.5, Math.max(0.5, Number(payload.rate) || 0.95)),
+      pitch: Math.min(1.5, Math.max(0.5, Number(payload.pitch) || 1)),
       volume: Math.min(1, Math.max(0, Number(payload.volume) || 1)),
     };
     io.emit("tts:settings", ttsSettings);
@@ -373,6 +579,7 @@ io.on("connection", (socket) => {
     const a = payload.animations || {};
     const allowedFollow = ["wings", "neon", "cat"];
     const allowedGift = ["treasure", "rose", "universe"];
+    const allowedEffects = ["fade", "bounce", "zoom", "slideRight", "flip"];
     const allowedPos = ["top-center", "center", "bottom-center"];
     const allowedChatStyles = ["glass-card", "pill", "speech", "stacked", "neon-line", "compact"];
     const chatPayload = payload.chat || {};
@@ -386,6 +593,8 @@ io.on("connection", (socket) => {
         enabled: a.enabled !== false,
         followStyle: allowedFollow.includes(a.followStyle) ? a.followStyle : (overlaySettings.animations?.followStyle || "wings"),
         giftStyle: allowedGift.includes(a.giftStyle) ? a.giftStyle : (overlaySettings.animations?.giftStyle || "treasure"),
+        followEffect: allowedEffects.includes(a.followEffect) ? a.followEffect : (overlaySettings.animations?.followEffect || "fade"),
+        giftEffect: allowedEffects.includes(a.giftEffect) ? a.giftEffect : (overlaySettings.animations?.giftEffect || "bounce"),
         followDuration: Math.min(10, Math.max(2, Number(a.followDuration) || overlaySettings.animations?.followDuration || 4)),
         giftDuration: Math.min(10, Math.max(2, Number(a.giftDuration) || overlaySettings.animations?.giftDuration || 5)),
         position: allowedPos.includes(a.position) ? a.position : (overlaySettings.animations?.position || "top-center"),
@@ -415,6 +624,51 @@ io.on("connection", (socket) => {
     musicNext();
   });
   socket.on("music:state", () => socket.emit("music:update", musicState()));
+  socket.on("ytauto:search", async (payload, ack) => {
+    const isObj = payload && typeof payload === "object";
+    const clean = String(isObj ? payload.query : payload || "").trim().slice(0, 160);
+    const limit = Math.max(3, Math.min(30, Number(isObj ? payload.limit : 15) || 15));
+    if (typeof ack !== "function") return;
+    if (!clean) { ack({ ok: false, message: "Kata kunci kosong." }); return; }
+    try {
+      const results = await searchYouTubeMulti(clean, limit);
+      ack({ ok: true, results });
+    } catch (err) {
+      ack({ ok: false, message: err?.message || "Gagal mencari di YouTube." });
+    }
+  });
+
+  // ---- Fallback playlist ("Auto DJ") ----
+  socket.on("music:fallback:get", () => {
+    socket.emit("music:fallback:update", fallbackState());
+    // Kalau panel baru connect dan gak ada apa-apa yang lagi main,
+    // langsung nyalain auto DJ (biar gak sunyi dari awal buka panel).
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length && fallbackPlaylist.length) {
+      playNextFallbackSong();
+    }
+  });
+  socket.on("music:fallback:add", ({ query } = {}) => {
+    const clean = String(query || "").trim().slice(0, 160);
+    if (!clean || fallbackPlaylist.length >= FALLBACK_MAX) return;
+    fallbackPlaylist.push(clean);
+    broadcastFallback();
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length) playNextFallbackSong();
+  });
+  socket.on("music:fallback:remove", ({ index } = {}) => {
+    if (typeof index === "number" && fallbackPlaylist[index] !== undefined) {
+      fallbackPlaylist.splice(index, 1);
+      broadcastFallback();
+    }
+  });
+  socket.on("music:fallback:clear", () => {
+    fallbackPlaylist = [];
+    broadcastFallback();
+  });
+  socket.on("music:fallback:toggle", ({ enabled } = {}) => {
+    fallbackEnabled = !!enabled;
+    broadcastFallback();
+    if (fallbackEnabled && !musicCurrent && !musicQueue.length) playNextFallbackSong();
+  });
 
   socket.on("tiktok:connect", async ({ username, signApiKey } = {}) => {
     // Starting a new LIVE session must start the chat feed from zero.
@@ -449,18 +703,23 @@ io.on("connection", (socket) => {
 });
 
 
+const ACTION_TYPES = ["tts", "alert", "sound", "keystroke", "message", "webhook"];
+
 function normalizeAction(a = {}) {
   return {
     id: String(a.id || Math.random().toString(36).slice(2, 9)),
     enabled: a.enabled !== false,
     event: ["comment", "like", "follow", "gift"].includes(a.event) ? a.event : "comment",
     keyword: String(a.keyword || "").slice(0, 80),
-    action: ["tts", "alert", "sound", "keypress"].includes(a.action) ? a.action : "tts",
-    value: String(a.value || "").slice(0, 200),
-    // Only used when action === "keypress":
-    key: String(a.key || "").slice(0, 20),
-    // How long to hold the key down, in milliseconds. 0 = quick tap.
-    holdMs: Math.min(10000, Math.max(0, Number(a.holdMs) || 0)),
+    action: ACTION_TYPES.includes(a.action) ? a.action : "tts",
+    // Arti "value" tergantung jenis aksinya:
+    //   tts/alert/sound -> sama seperti sebelumnya
+    //   keystroke       -> nama tombol Roblox, mis. "P", "SPACE", "ONE"
+    //   message         -> teks pesan yang muncul di overlay
+    //   webhook         -> URL tujuan (GET request)
+    value: String(a.value || "").slice(0, 300),
+    // Cuma dipakai kalau action === "message": URL gambar/foto opsional.
+    image: String(a.image || "").slice(0, 500),
   };
 }
 
@@ -494,10 +753,48 @@ function runCustomActions(payload) {
       });
     } else if (action.action === "sound") {
       io.emit("event", { kind: "sound", id: action.value || "ding" });
-    } else if (action.action === "keypress") {
-      simulateKeypress(action.key, action.holdMs);
+    } else if (action.action === "keystroke") {
+      // Kirim tombol ke antrian Roblox bridge, sama seperti GIFT_KEY_MAP
+      // tapi bisa diatur langsung dari panel, untuk event apapun (bukan
+      // cuma gift) dan dengan syarat keyword.
+      queueKey(String(action.value || "").trim().toUpperCase(), {
+        username: payload.username || "",
+        giftName: payload.giftName || (payload.type === "gift" ? (payload.extra || "") : ""),
+        count: payload.count || 1,
+      });
+    } else if (action.action === "message") {
+      // Pesan custom (teks + foto opsional) muncul di overlay-message.html
+      io.emit("event", {
+        kind: "message",
+        text: replaceVars(action.value),
+        image: action.image || "",
+      });
+    } else if (action.action === "webhook") {
+      fireWebhook(replaceVars(action.value));
     }
   }
+}
+
+// Trigger webhook lewat GET request. Sengaja dibuat "fire and forget":
+// gagal atau timeout gak boleh sampai crash / nge-block event lain.
+function fireWebhook(rawUrl) {
+  let url;
+  try {
+    url = new URL(String(rawUrl || "").trim());
+  } catch {
+    console.warn(`[webhook] URL tidak valid, dilewati: ${rawUrl}`);
+    return;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    console.warn(`[webhook] Protokol tidak didukung: ${url.protocol}`);
+    return;
+  }
+  const lib = url.protocol === "https:" ? https : http;
+  const req = lib.get(url, { timeout: 8000 }, (res) => {
+    res.resume(); // buang body, kita cuma peduli trigger-nya jalan
+  });
+  req.on("timeout", () => req.destroy(new Error("Webhook timeout")));
+  req.on("error", (err) => console.warn(`[webhook] Gagal: ${err.message}`));
 }
 
 function processEvent(payload = {}, meta = {}) {
@@ -566,14 +863,7 @@ function processEvent(payload = {}, meta = {}) {
     if (payload.type === "follow") streamStats.follows += 1;
     if (payload.type === "gift") {
       streamStats.gifts += 1;
-      // Remember this gift's real name + coin cost per unit (payload.coins
-      // is already multiplied by count, so divide back down) so the
-      // Custom Events gift dropdown can offer it going forward.
-      if (payload.giftName) {
-        const count = Math.max(1, Number(payload.count) || 1);
-        const perUnitCoins = Number(payload.coins || 0) / count;
-        rememberGift(payload.giftName, perUnitCoins);
-      }
+      maybeQueueEffectForGift(payload);
     }
 
     // Keep the current goal synchronized with the selected event.
