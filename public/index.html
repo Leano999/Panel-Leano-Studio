@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Spoof UI PRO</title>
+<style>
+body {
+  margin:0;
+  background:#020617;
+  color:white;
+  font-family:sans-serif;
+}
+
+.container {
+  display:flex;
+  height:100vh;
+}
+
+.sidebar {
+  width:200px;
+  background:#020617;
+  border-right:1px solid #1e293b;
+  padding:20px;
+}
+
+.sidebar button {
+  display:block;
+  width:100%;
+  margin-bottom:10px;
+  padding:10px;
+  background:#0f172a;
+  border:none;
+  color:white;
+  border-radius:8px;
+  cursor:pointer;
+}
+
+.sidebar button.active {
+  background:orange;
+  color:black;
+}
+
+.content {
+  flex:1;
+  padding:40px;
+}
+
+.card {
+  max-width:500px;
+  margin:auto;
+  background:#0f172a;
+  padding:20px;
+  border-radius:12px;
+}
+
+textarea {
+  width:100%;
+  height:120px;
+  background:#020617;
+  color:white;
+  border:1px solid #1e293b;
+  border-radius:8px;
+  padding:10px;
+}
+
+button.download {
+  width:100%;
+  background:orange;
+  border:none;
+  padding:12px;
+  border-radius:8px;
+  margin-top:10px;
+  font-weight:bold;
+  cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="sidebar">
+  <button class="active" onclick="showTab('spoof')">Spoof</button>
+</div>
+
+<div class="content">
+
+<div id="spoof" class="card">
+  <h2>Roblox Public Asset Downloader</h2>
+  <p>Download audio Roblox jadi ZIP</p>
+
+  <textarea id="ids" placeholder="Masukkan ID (1 per baris)"></textarea>
+
+  <button class="download" onclick="go()">⬇ UNDUH SEMUA ASET (.ZIP)</button>
+
+  <p id="status">Idle</p>
+</div>
+
+</div>
+</div>
+
+<script>
+function showTab(id){
+  document.querySelectorAll('.card').forEach(x=>x.style.display='none');
+  document.getElementById(id).style.display='block';
+}
+
+async function go(){
+  const ids = document.getElementById("ids").value.split("\n").filter(x=>x.trim());
+  let status = document.getElementById("status");
+
+  status.innerText = "Processing 0/" + ids.length;
+
+  const res = await fetch("/download", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ids})
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "assets.zip";
+  a.click();
+
+  status.innerText = "Selesai!";
+}
+</script>
+
+</body>
+</html>
