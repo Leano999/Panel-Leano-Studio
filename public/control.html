@@ -9,18 +9,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css" />
 <link rel="stylesheet" href="control.css">
-<link rel="stylesheet" href="lite-mode.css">
-<script>
-  // Aktifkan lagi Mode Ringan otomatis kalau sebelumnya pernah
-  // dinyalain, sebelum halaman sempat ke-render (biar gak "kedip").
-  (function () {
-    try {
-      if (localStorage.getItem("panelLeanoLiteMode") === "1") {
-        document.documentElement.classList.add("lite-mode");
-      }
-    } catch (e) {}
-  })();
-</script>
 </head>
 <body>
 <div class="app-shell">
@@ -43,7 +31,6 @@
       <button data-tab="tts"><span class="nav-icon">◌</span><span>Text-to-Speech</span></button>
       <button data-tab="sound"><span class="nav-icon">◖</span><span>Soundboard</span></button>
       <button data-tab="music"><span class="nav-icon">♫</span><span>Music Request</span></button>
-      <button data-tab="ytauto"><span class="nav-icon">🎬</span><span>YouTube Player</span></button>
       <button data-tab="simulator"><span class="nav-icon">▷</span><span>Simulator</span></button>
     </nav>
     <div class="side-section-label side-bottom-label">SYSTEM</div>
@@ -59,7 +46,6 @@
       <div class="topbar-right">
         <span class="top-chip">⌁ LOCAL PANEL</span>
         <span class="top-status"><i id="topConnDot"></i><span id="topConnStatus">BELUM TERHUBUNG</span></span>
-        <button class="v38-icon-btn" type="button" id="liteModeToggle" aria-label="Mode Ringan" title="Mode Ringan: nonaktif (klik untuk aktifkan, mematikan efek blur/glow biar panel lebih ringan)">⚡</button>
         <button class="v38-icon-btn" type="button" aria-label="Notifikasi" title="Notifikasi">♧</button>
         <button class="v38-icon-btn" type="button" aria-label="Pengaturan" title="Pengaturan">⚙</button>
         <div class="top-avatar">L</div>
@@ -332,27 +318,11 @@
         <div class="field" style="margin:0;min-width:190px;flex:1;"><label>STYLE GIFT</label><select id="giftAnimStyle"><option value="treasure">Style 1 — Treasure</option><option value="rose">Style 2 — Rose</option><option value="universe">Style 3 — Universe</option></select></div>
       </div>
       <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
-        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>EFEK MASUK FOLLOW</label><select id="followAnimEffect">
-          <option value="fade">Fade Lembut</option>
-          <option value="bounce">Bounce Pop</option>
-          <option value="zoom">Zoom Pop</option>
-          <option value="slideRight">Slide dari Kanan</option>
-          <option value="flip">Flip 3D</option>
-        </select></div>
-        <div class="field" style="margin:0;min-width:190px;flex:1;"><label>EFEK MASUK GIFT</label><select id="giftAnimEffect">
-          <option value="fade">Fade Lembut</option>
-          <option value="bounce">Bounce Pop</option>
-          <option value="zoom">Zoom Pop</option>
-          <option value="slideRight">Slide dari Kanan</option>
-          <option value="flip">Flip 3D</option>
-        </select></div>
-      </div>
-      <div class="row" style="margin-top:12px;gap:18px;flex-wrap:wrap;align-items:stretch;">
         <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI FOLLOW (DETIK)</label><input id="followAnimDuration" type="number" min="2" max="10" step="1" value="4"></div>
         <div class="field" style="margin:0;min-width:180px;flex:1;"><label>DURASI GIFT (DETIK)</label><input id="giftAnimDuration" type="number" min="2" max="10" step="1" value="5"></div>
         <div class="field" style="margin:0;min-width:190px;flex:1;"><label>POSISI</label><select id="animPosition"><option value="top-center">Atas Tengah</option><option value="center">Tengah</option><option value="bottom-center">Bawah Tengah</option></select></div>
       </div>
-      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveAnimationSettings()">Simpan Animasi</button><button class="btn" onclick="testAnimation('follow')">▶ Test Follow</button><button class="btn" onclick="testAnimation('gift')">▶ Test Gift</button><button class="btn" onclick="testAnimationSpam('gift')">▶ Test Spam (5x)</button><span class="hint" id="animStatus" style="margin:0;">Belum disimpan.</span></div>
+      <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap;"><button class="btn" onclick="saveAnimationSettings()">Simpan Animasi</button><button class="btn" onclick="testAnimation('follow')">▶ Test Follow</button><button class="btn" onclick="testAnimation('gift')">▶ Test Gift</button><span class="hint" id="animStatus" style="margin:0;">Belum disimpan.</span></div>
     </div>
 
     <div class="field" style="margin-top:18px;">
@@ -362,7 +332,6 @@
       <div class="url-box"><b style="min-width:180px;">LIVE GOAL</b><code id="srcGoal">memuat...</code><button class="btn" onclick="cp('srcGoal')">Salin</button></div>
       <div class="url-box"><b style="min-width:180px;">ALERT + TTS</b><code id="srcAlert">memuat...</code><button class="btn" onclick="cp('srcAlert')">Salin</button></div>
       <div class="url-box"><b style="min-width:180px;">TTS ONLY (opsional)</b><code id="srcTts">memuat...</code><button class="btn" onclick="cp('srcTts')">Salin</button></div>
-      <div class="url-box"><b style="min-width:180px;">PESAN OVERLAY</b><code id="srcMessage">memuat...</code><button class="btn" onclick="cp('srcMessage')">Salin</button></div>
       <div class="url-box"><code id="galleryCommentsUrl">memuat...</code><button class="btn" onclick="copyCommentsUrl()">Salin</button></div>
       <div class="url-box"><code id="galleryOverlayUrl">memuat...</code><button class="btn" onclick="copyOverlayUrl()">Salin</button></div>
     </div>
@@ -408,18 +377,23 @@
     </div>
 
     <div class="field" style="border-top:1px solid var(--line); padding-top:20px;">
-      <label>SUARA TTS</label>
-      <div class="voice-status" style="font-size:15px; padding:12px 14px; border:1px solid var(--line); border-radius:10px;">
-        <b>IndoFinity Natural</b> · Microsoft Neural · Bahasa Indonesia
-      </div>
-      <div class="voice-status" id="voiceStatus">Engine: Microsoft Edge Neural · Voice tetap: id-ID-GadisNeural</div>
+      <label>PILIH SUARA</label>
+      <select id="ttsVoice" onchange="updateTtsSettings()">
+        <option value="">Otomatis — Bahasa Indonesia</option>
+      </select>
+      <div class="voice-status" id="voiceStatus">Mencari suara yang tersedia di browser…</div>
       <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap;">
         <button class="btn" onclick="unlockTts()">🔊 Aktifkan TTS Live</button>
-        <button class="btn" onclick="testSelectedVoice()">Tes Suara IndoFinity Natural</button>
+        <button class="btn" onclick="testSelectedVoice()">Tes Suara Terpilih</button>
       </div>
       <div class="hint" id="ttsDiagnostic" style="margin-top:7px;">
-        TTS memakai Microsoft Edge Neural server-side, tanpa API key Azure. Suara dikunci ke satu preset natural Bahasa Indonesia agar hasil konsisten di OBS/Linux/Windows.
+        TTS komentar LIVE berjalan dari panel ini setelah tombol "Aktifkan TTS Live" ditekan sekali. Ini menghindari blokir autoplay pada Browser Source OBS.
       </div>
+      <p class="hint">
+        Daftar ini mengikuti suara yang tersedia di komputer/browser. Jika Chrome menyediakan
+        suara Google, biasanya akan muncul sebagai <b>Google ...</b>. Suara perempuan/laki-laki
+        yang tersedia juga akan muncul di sini.
+      </p>
     </div>
 
     <div class="row" style="gap:16px; flex-wrap:wrap;">
@@ -434,7 +408,7 @@
         <div class="voice-status"><span id="ttsPitchValue">1.00</span></div>
       </div>
       <div class="field" style="flex:1; min-width:220px; margin:0;">
-        <label>VOLUME TTS</label>
+        <label>VOLUME GOOGLE TTS</label>
         <input type="range" id="ttsVolume" min="0" max="100" step="1" value="100" oninput="updateTtsSettings()">
         <div class="voice-status"><span id="ttsVolumeValue">100%</span></div>
       </div>
@@ -492,72 +466,6 @@
       </div>
       <div id="musicQueueList" class="log" style="max-height:240px;margin-top:14px;"></div>
       <p class="hint">Catatan: kualitas video meminta mode <b>tiny/144p</b> bila YouTube menyediakan level tersebut. YouTube tetap dapat memilih kualitas adaptif sendiri. Untuk musik: biarkan audio berasal dari Chrome. Jangan mengaktifkan audio dari Browser Source OBS untuk musik.</p>
-    </div>
-  </section>
-
-  <!-- YOUTUBE PLAYER (AUTO, TANPA REQUEST) -->
-  <section class="panel" id="tab-ytauto">
-    <div class="panel" style="display:block">
-      <h2>🎬 YouTube Player (Auto, Tanpa Request)</h2>
-      <p class="hint">
-        Beda dari Music Request di atas: di sini kamu <b>pilih sendiri</b> playlist atau kata kunci
-        YouTube sekali, terus videonya <b>lanjut sendiri otomatis</b> ke video berikutnya — persis
-        kayak nonton YouTube biasa dan gak perlu request ulang-ulang. Cocok buat pengisi pas gak ada
-        yang request lagu di tab Music Request.
-      </p>
-      <p class="hint" style="color:#e8a33d;">
-        Catatan: <code>youtube.com</code> versi lengkap (yang ada kolom search) memang gak bisa
-        ditanam di halaman lain (diblokir YouTube sendiri). Jadi di sini pakai player YouTube resmi
-        yang bisa dikasih <b>link playlist</b> atau <b>kata kunci pencarian</b> — hasilnya sama,
-        tetap auto lanjut ke video berikutnya sendiri.
-      </p>
-      <div class="field" style="margin-top:16px;">
-        <label>GENRE CEPAT (opsional)</label>
-        <div class="row" style="flex-wrap:wrap;gap:8px;">
-          <button class="btn secondary" type="button" onclick="playYtGenre('classic')">🎻 Klasik</button>
-          <button class="btn secondary" type="button" onclick="playYtGenre('dj')">🎧 DJ / Remix</button>
-          <button class="btn secondary" type="button" onclick="playYtGenre('barat')">🌍 Barat / English</button>
-        </div>
-        <p class="hint" style="margin-top:8px;">
-          Tombol ini otomatis cari & acak (shuffle) lagu-lagu dalam genre itu aja — gak nyampur
-          sama genre lain. Loop otomatis dinyalakan biar terus lanjut. Mau genre lain? Ketik kata
-          kunci sendiri di kolom bawah, misalnya "dangdut koplo" atau "lofi hip hop".
-        </p>
-      </div>
-      <div class="field" style="margin-top:16px;">
-        <label>PLAYLIST ATAU KATA KUNCI</label>
-        <div class="row" style="flex-wrap:wrap;gap:8px;">
-          <input id="ytAutoInput" type="text" placeholder="Tempel link playlist YouTube, ATAU ketik kata kunci mis. 'lofi hip hop radio'" style="flex:1;min-width:220px">
-          <button class="btn" onclick="playYoutubeAuto()">▶ Putar</button>
-        </div>
-        <p class="hint" style="margin-top:8px;">
-          Contoh link playlist: <code>https://www.youtube.com/playlist?list=PLxxxxxxxx</code> (playlist
-          punya kamu sendiri di YouTube, atau playlist musik bebas royalti yang kamu suka).
-          Kalau cuma ketik kata kunci biasa (bukan link), sistem otomatis muter hasil pencarian itu
-          berurutan satu-satu.
-        </p>
-      </div>
-      <div class="row" style="margin-top:8px;align-items:center;gap:10px;flex-wrap:wrap;">
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
-          <input type="checkbox" id="ytAutoShuffle" checked onchange="toggleYtAutoShuffle()"> Acak urutan (shuffle, biar gak kerasa ngulang)
-        </label>
-        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);">
-          <input type="checkbox" id="ytAutoLoop" onchange="toggleYtAutoLoop()"> Ulangi playlist dari awal (loop)
-        </label>
-      </div>
-      <div class="field" style="margin-top:16px;">
-        <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap;">
-          <button class="btn" id="ytAutoActivateBtn" type="button" onclick="activateYtAuto()">▶ Aktifkan Audio Chrome (YouTube Player)</button>
-          <span id="ytAutoStatus" class="voice-status">Belum diaktifkan</span>
-        </div>
-        <div id="ytAutoPlayer" style="width:min(480px,100%);height:270px;background:#000;border-radius:12px;overflow:hidden;margin-top:12px;"></div>
-        <p class="hint">
-          Sama seperti Music Request: audio diambil OBS lewat <b>Application Audio Capture</b> dari
-          halaman Chrome ini, gak perlu buka tab YouTube terpisah. <b>Cuma satu pemutar yang aktif
-          dalam satu waktu</b> — kalau kamu mulai muter di sini, Music Request otomatis berhenti
-          (biar gak dobel suara), dan sebaliknya.
-        </p>
-      </div>
     </div>
   </section>
 
@@ -628,33 +536,6 @@
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="control.js" defer></script>
-<script>
-  // Tombol Mode Ringan (⚡) di topbar: nyala/mati efek blur & glow
-  // yang berat di rendering, terutama di Linux tanpa GPU acceleration.
-  (function () {
-    var btn = document.getElementById("liteModeToggle");
-    if (!btn) return;
-
-    function sync() {
-      var on = document.documentElement.classList.contains("lite-mode");
-      btn.style.color = on ? "#39d98a" : "";
-      btn.title = on
-        ? "Mode Ringan: AKTIF (klik untuk kembali ke tampilan normal)"
-        : "Mode Ringan: nonaktif (klik untuk aktifkan, mematikan efek blur/glow biar panel lebih ringan)";
-    }
-
-    btn.addEventListener("click", function () {
-      document.documentElement.classList.toggle("lite-mode");
-      var on = document.documentElement.classList.contains("lite-mode");
-      try {
-        localStorage.setItem("panelLeanoLiteMode", on ? "1" : "0");
-      } catch (e) {}
-      sync();
-    });
-
-    sync();
-  })();
-</script>
 
     </div>
   </main>

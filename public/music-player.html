@@ -34,7 +34,6 @@ let player = null;
 let activated = false;
 let apiReady = false;
 let currentVideoId = null;
-let altCandidateQueue = [];
 let pendingItem = null;
 let lastStartedVideoId = null;
 let musicVolume = 0.75;
@@ -87,29 +86,15 @@ window.onYouTubeIframeAPIReady = function() {
           const id = currentVideoId;
           currentVideoId = null;
           lastStartedVideoId = null;
-          altCandidateQueue = [];
           socket.emit('music:ended', {videoId:id});
         }
       },
       onError: function() {
-        // Video ini mungkin cuma dibatasi pemiliknya (gak bisa ditanam di
-        // web lain), bukan hilang beneran. Coba upload lain dari lagu yang
-        // sama dulu sebelum nge-skip request ini.
-        if (altCandidateQueue.length) {
-          const nextId = altCandidateQueue.shift();
-          setStatus('⚠️ Video ini dibatasi pemiliknya, mencoba versi lain…', 'warn');
-          try {
-            player.loadVideoById({ videoId: nextId, startSeconds: 0, suggestedQuality: 'tiny' });
-            setTimeout(() => { try { player.setPlaybackQuality('tiny'); } catch(e) {} }, 1200);
-          } catch(e) {}
-          return;
-        }
-        setStatus('❌ Semua versi video ini gagal diputar. Mencoba request berikutnya…', 'warn');
+        setStatus('❌ YouTube menolak video ini. Mencoba request berikutnya…', 'warn');
         if (currentVideoId) {
           const id = currentVideoId;
           currentVideoId = null;
           lastStartedVideoId = null;
-          altCandidateQueue = [];
           socket.emit('music:ended', {videoId:id});
         }
       }
@@ -129,7 +114,6 @@ function startItem(item) {
 
   if (lastStartedVideoId === item.videoId) return;
   lastStartedVideoId = item.videoId;
-  altCandidateQueue = Array.isArray(item.altCandidates) ? item.altCandidates.map(c => c.videoId).filter(Boolean) : [];
 
   setStatus('⏳ Memulai: <b>' + (item.title || 'Lagu') + '</b> — @' +
             (item.requestedBy || 'Penonton'), '');
@@ -154,7 +138,6 @@ function render(state) {
     pendingItem = null;
     currentVideoId = null;
     lastStartedVideoId = null;
-    altCandidateQueue = [];
     if (player && apiReady) {
       try { player.stopVideo(); } catch(e) {}
     }

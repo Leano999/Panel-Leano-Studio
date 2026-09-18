@@ -37,19 +37,6 @@ if not exist "node_modules\express\package.json" (
     pause
     exit /b 1
   )
-) else if not exist "node_modules\node-edge-tts\package.json" (
-  echo.
-  echo [1/2] Modul TTS Natural belum ada. Memasang node-edge-tts...
-  echo.
-  call npm install --no-fund --no-audit
-  if errorlevel 1 (
-    echo.
-    echo [ERROR] Instalasi modul TTS Natural gagal.
-    echo Pastikan internet aktif lalu jalankan lagi.
-    echo.
-    pause
-    exit /b 1
-  )
 ) else (
   echo [1/2] Dependency sudah terpasang. Lewati npm install.
 )
