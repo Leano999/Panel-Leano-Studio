@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Spoof Downloader</title>
+<style>
+body { background:#020617; color:white; font-family:sans-serif; }
+.box { max-width:500px; margin:50px auto; background:#0f172a; padding:20px; border-radius:12px; }
+textarea { width:100%; height:120px; background:#020617; color:white; border:1px solid #1e293b; border-radius:8px; padding:10px; }
+button { width:100%; background:orange; border:none; padding:12px; border-radius:8px; margin-top:10px; font-weight:bold; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="box">
+<h2>Roblox Spoof Downloader</h2>
+
+<textarea id="ids" placeholder="Masukkan ID (1 per baris)"></textarea>
+<button onclick="go()">Download ZIP</button>
+<p id="status">Idle</p>
+</div>
+
+<script>
+async function go() {
+  const ids = document.getElementById("ids").value.split("\n").filter(x=>x.trim());
+  document.getElementById("status").innerText = "Processing...";
+
+  const res = await fetch("/download", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({ids})
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "assets.zip";
+  a.click();
+
+  document.getElementById("status").innerText = "Done!";
+}
+</script>
+
+</body>
+</html>

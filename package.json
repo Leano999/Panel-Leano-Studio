@@ -1,16 +1,11 @@
 {
-  "name": "streampanel",
+  "name": "roblox-direct-downloader",
   "version": "1.0.0",
-  "private": true,
-  "description": "Panel siaran pribadi - overlay, soundboard, dan TTS untuk live streaming (basic version, personal use).",
   "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
+  "scripts": { "start": "node server.js" },
   "dependencies": {
-    "@nut-tree-fork/nut-js": "^4.2.6",
-    "express": "^4.19.2",
-    "socket.io": "^4.7.5",
-    "tiktok-live-connector": "^2.4.3"
+    "express": "^4.18.2",
+    "axios": "^1.6.0",
+    "archiver": "^6.0.2"
   }
 }
